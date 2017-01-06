@@ -1,0 +1,6 @@
+{
+    "botToken": "APP_BOT_USER_TOKEN",
+    "forecastDb": "./forecast.db",
+    "warmomDb": "./warmom.db",
+    "appClientId": "DISCORD_APP_CLIENT_ID"
+}

@@ -1,0 +1,17 @@
+# Logs
+#logs
+#*.log
+
+# Runtime data
+#pids
+#*.pid
+
+# Dependency directories
+node_modules
+
+# Databases
+*.db
+
+# Configuration file
+config.json
+
