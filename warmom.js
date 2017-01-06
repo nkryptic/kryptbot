@@ -36,6 +36,7 @@ const status_regex = new RegExp(
   , 'm')
 // const war_regex = new RegExp(/warmatch.us\/clans\/war\/(\d+)/, 'm')
 const re = new RegExp(/^\d+\. TH\d+ (.*) ([12]) attacks left$/)
+const roster_regex = new RegExp(/^TH(\d+) (.*) \$\d+(?: k\d+)?(?: q\d+)?(?: w\d+)?$/)
 const usage = '*The WarMom commands:*' + '\n'
   + '**`!warmom add @mention CLASHID    ` **- ' + '\n'
   + '**`!warmom remove @mention CLASHID ` **- ' + '\n'
@@ -104,6 +105,19 @@ function WarMom(config, client) {
   this.client.on('ready', this.onReady.bind(this))
 }
 
+WarMom.prototype.getMember = function(discordId) {
+  let target = this.guild.members.find( member => member.user.id === discordId )
+  // let target = this.guild.members.find((member) => {
+  //   if (member.user.username.toLowerCase() === name
+  //       || (member.nickname && member.nickname.toLowerCase() === name)
+  //   ) {
+  //     return true
+  //   }
+  //   return false
+  // })
+  return target
+}
+
 WarMom.prototype.processStatus = function(roomName, msg) {
   // - if no war, then we simply wait for msg "the war is active" => no timer
   // - if War starts... we set timer to recheck after parsing amount of time
@@ -128,6 +142,53 @@ WarMom.prototype.processStatus = function(roomName, msg) {
       // else if time left is > 2 hours, setup timer to nag at 2 hours left
     }
   }
+}
+
+WarMom.prototype.processRoster = function(roomName, msg) {
+  // parse out the CoC account names
+  // match CoC account names with owner (nickname or username), if known
+  // send message: list CoC roster with owner for each entry
+  let roster = []
+    // , output = intro + '\n'
+    , output = ''
+    // , channel = msg.channel
+    , message = msg.content
+
+  for (let line of message.split(/\r?\n/)) {
+    // console.log('line: =>' + line + '<=')
+    let match = roster_regex.exec(line)
+    if (match) {
+      roster.push({
+          discordid: this.accounts.clash.get(match[2])
+        , clashid: match[2]
+        , townhall: match[1]
+      })
+      console.log('member found: ' + match[2])
+    }
+  }
+  if (roster.length > 0) {
+    for (let entry of roster) {
+      let member = this.getMember(entry.discordid)
+        , name
+      if (member) {
+        if (member.nickname) {
+          name = member.nickname
+        }
+        else {
+          name = member.user.username
+        }
+        // output = output + `${entry.clashid} is owned by $name (UID: $entry.uid)` + '\n'
+        output = output + `${entry.clashid} is owned by $name` + '\n'
+      }
+      else {
+        output = output + `${entry.clashid} is not owned (UID: $entry.uid)` + '\n'
+      }
+    }
+  }
+  else {
+    output = 'Could not find a roster!'
+  }
+  return output
 }
 
 WarMom.prototype.setupWarTimer = function(roomName) {
@@ -176,9 +237,6 @@ WarMom.prototype.onMessage = function(msg) {
           //
         })
       msg.channel.sendMessage('.list status').then(m => m.delete())
-      // parse out the CoC account names
-      // match CoC account names with owner (nickname or username), if known
-      // send message: list CoC roster with owner for each entry
     }
     else {
       msg.channel.sendMessage('I didn\'t understand that... try typing `!warmom` for the available commands')
@@ -192,9 +250,9 @@ WarMom.prototype.onReady = function() {
   this.warrooms.hnh = this.client.channels.find('name', 'hnh-warroom')
   this.warrooms.fnf = this.client.channels.find('name', 'fnf-warroom')
   this.guild = this.warrooms.gng.guild
-  this.setupWarTimer('gng')
-  this.setupWarTimer('hnh')
-  this.setupWarTimer('fnf')
+  // this.setupWarTimer('gng')
+  // this.setupWarTimer('hnh')
+  // this.setupWarTimer('fnf')
 }
 
 
