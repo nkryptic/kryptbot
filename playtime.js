@@ -129,7 +129,7 @@ Playtime.prototype.onReady = function() {
     this.online = true
     Cleverbot.prepare(() => {})
   }
-  bot.user.setGame("with Stacey's mind")
+  this.client.user.setGame("with Stacey's mind")
 }
 
 

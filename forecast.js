@@ -214,7 +214,7 @@ Forecast.prototype.onReady = function() {
   if (!this.online) {
     console.log('Forecast is online! ' + new Date())
     this.online = true
-    this.channel = this.client.channels.find('name', this.options.channelName)
+    this.channel = this.client.channels.find('name', this.options.channel)
     if (this.nextpoll && nowDT < this.nextpoll) {
       interval = this.nextpoll - nowDT
     }
