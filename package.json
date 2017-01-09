@@ -1,7 +1,7 @@
 {
   "name": "kryptbot",
   "version": "1.0.0",
-  "description": "",
+  "description": "A Discord bot",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -21,6 +21,7 @@
     "cleverbot-node": "^0.2.5",
     "discord.js": "^11.0.0",
     "node-storage": "0.0.7",
-    "request": "^2.79.0"
+    "request": "^2.79.0",
+    "string-hash": "^1.1.1"
   }
 }

@@ -17,23 +17,9 @@ const pollIntro = '**current loot forecast** *from clashofclansforecaster.com*'
 const unavailable = 'Sorry, clashofclansforecaster.com is currently unavailable.' +
     '\n\nTry going directly to http://clashofclansforecaster.com'
 
-var timers = timers || []
-
-function clearTimers() {
-  if (timers.length > 0) {
-    for (let tID of timers) {
-      clearTimeout(tID);
-    }
-    timers = []
-  }
-}
-
-function addTimer(func, interval) {
-  timers[timers.length] = setTimeout(func, interval)
-}
-
 function Forecast(config, client) {
-  this.annChannel = null
+  this.channel = null
+  this.options = Object.assign({}, config.forecast)
   this.client = client
   this.forecast = {
       message: ''
@@ -42,16 +28,19 @@ function Forecast(config, client) {
     , hours: 0
     , minutes: 0
   }
-  this.db = new Storage(config.forecastDb)
+  this.db = new Storage(this.options.db)
   this.subs = {
       excellent: new Set(this.db.get('subscribers.excellent') || [])
     , great: new Set(this.db.get('subscribers.great') || [])
     , good: new Set(this.db.get('subscribers.good') || [])
   }
   this.nextpoll = this.db.get('nextpoll') || 0
+  this.online = false
 
-  this.client.on("message", this.onMessage.bind(this))
-  this.client.on('ready', this.onReady.bind(this))
+  if (this.options.enabled) {
+    this.client.on("message", this.onMessage.bind(this))
+    this.client.on('ready', this.onReady.bind(this))
+  }
 }
 
 // Forecast.DEFAULTS = {
@@ -60,8 +49,6 @@ function Forecast(config, client) {
 
 Forecast.prototype.getForecast = function() {
   console.log('polling forecast at ' + new Date())
-
-  clearTimers()
 
   Request({
     url: forecastURL
@@ -72,7 +59,7 @@ Forecast.prototype.getForecast = function() {
       interval = this.processForecast(body.forecastMessages.english, body.forecastWordNow)
     }
     console.log('next forecast poll in ' + (interval/1000) + ' seconds')
-    addTimer(this.getForecast.bind(this), interval)
+    setTimeout(this.getForecast.bind(this), interval)
     this.nextpoll = new Date().getTime() + interval
     this.db.put('nextpoll', this.nextpoll)
   }.bind(this))
@@ -99,13 +86,13 @@ Forecast.prototype.processForecast = function(sourceMessage, word) {
     message = message.replace(status, `**${status}**`)
   }
   
-  this.annChannel.fetchMessages()
+  this.channel.fetchMessages()
     .then( messages => {
       messages.filter( m => !m.pinned ).deleteAll()
     })
     .then( 
       function() {
-        this.annChannel.sendMessage(pollIntro + '\n' + message)
+        this.channel.sendMessage(pollIntro + '\n' + message)
       }.bind(this)
     )
 
@@ -174,7 +161,7 @@ Forecast.prototype.unsubscribe = function(username) {
 Forecast.prototype.onMessage = function(msg) {
   let output
   if (msg.content === '!forecast') {
-    output = 'You can see the latest forecast in ' + this.annChannel + '\n'
+    output = 'You can see the latest forecast in ' + this.channel + '\n'
       + '*You might also be interested in subscription:*' + '\n'
       + '**`!forecast subscribe        ` **- get pinged when loot is EXCELLENT' + '\n'
       + '**`!forecast subscribe great  ` **- get pinged when loot is GREAT or EXCELLENT' + '\n'
@@ -222,16 +209,18 @@ Forecast.prototype.onMessage = function(msg) {
 }
 
 Forecast.prototype.onReady = function() {
-  console.log('Forecast is ready! ' + new Date())
-  this.annChannel = this.client.channels.find('name', 'loot-forecast')
   let nowDT = new Date().getTime()
     , interval = 1000
-  if (this.nextpoll && nowDT < this.nextpoll) {
-    interval = this.nextpoll - nowDT
-  } else {
+  if (!this.online) {
+    console.log('Forecast is online! ' + new Date())
+    this.online = true
+    this.channel = this.client.channels.find('name', this.options.channelName)
+    if (this.nextpoll && nowDT < this.nextpoll) {
+      interval = this.nextpoll - nowDT
+    }
+    console.log('starting forecast poll in ' + (interval/1000) + ' seconds')
+    setTimeout(this.getForecast.bind(this), interval)
   }
-  console.log('starting forecast poll in ' + (interval/1000) + ' seconds')
-  addTimer(this.getForecast.bind(this), interval)
 }
 
 

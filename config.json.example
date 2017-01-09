@@ -1,6 +1,31 @@
 {
     "botToken": "APP_BOT_USER_TOKEN",
-    "forecastDb": "./forecast.db",
-    "warmomDb": "./warmom.db",
+    "forecast": {
+        "enabled": true,
+        "db": "./forecast.db",
+        "channel": "loot-forecast"
+    },
+    "warmom": {
+        "enabled": true,
+        "db": "./warmom.db",
+        "guild": "Playmakers Wanted",
+        "warrooms": {
+            "gng-warroom": {
+                "enabled": true,
+                "clan": "Grit N Grind"
+            },
+            "hnh-warroom": {
+                "enabled": true,
+                "clan": "Heart N Hustle"
+            },
+            "fnf-warroom": {
+                "enabled": true,
+                "clan": "Fire N Fury"
+            }
+        }
+    },
+    "playtime": {
+        "enabled": true
+    },
     "appClientId": "DISCORD_APP_CLIENT_ID"
 }

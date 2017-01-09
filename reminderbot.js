@@ -2,7 +2,7 @@
 TODO: 
 
 To add to server with administrator permission:
-https://discordapp.com/oauth2/authorize?client_id=256862081767309315&permissions=8&scope=bot 
+https://discordapp.com/oauth2/authorize?client_id=APPLICATION_CLIENT_ID&permissions=8&scope=bot 
 */
 
 const config = require('./config.json')
