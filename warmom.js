@@ -39,12 +39,15 @@ const status_regex = new RegExp(
 const lineup_regex = new RegExp(/^\d+\. TH\d+ (.*) ([12]) attacks left$/)
 const roster_regex = new RegExp(/^TH(\d+) (.*) \$\d+(?: k\d+)?(?: q\d+)?(?: w\d+)?$/)
 const usage = '*The WarMom commands:*' + '\n'
-  + '**`!warmom add @mention CLASHID      ` **- ' + '\n'
-  + '**`!warmom remove @mention [CLASHID] ` **- ' + '\n'
-  + '**`!warmom list owners               ` **- ' + '\n'
-  + '**`!warmom clan roster               ` **- ' + '\n'
-  + '**`!warmom march                     ` **- '
+  + '**`!warmom add CLASHID to USERNAME ` **- ' + '\n'
+  + '**`!warmom remove USERNAME         ` **- ' + '\n'
+  // + '**`!warmom add @mention CLASHID      ` **- ' + '\n'
+  // + '**`!warmom remove @mention [CLASHID] ` **- ' + '\n'
+  + '**`!warmom list owners             ` **- ' + '\n'
+  + '**`!warmom clan roster             ` **- ' + '\n'
+  + '**`!warmom march                   ` **- '
 const badChannel = 'WarMom can only be run from a war room channel'
+
 
 function WarMom(config, client) {
   // this.annChannel = null
@@ -204,10 +207,74 @@ WarMom.prototype.getLineup = function(roomName) {
   return promise
 }
 
-WarMom.prototype.notify = function(roomName, bothOnly, timeleft) {
+WarMom.prototype.getStatus = function(roomName) {
+  // get the current war status from '.status'
+  const filter = m => m.author.bot && m.author.username === 'wmbot' && status_regex.test(m.content)
+
+  let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
+    .then( function(collected) {
+      let response = collected.first()
+      const status = this.parseStatus(response.content)
+      response.delete()
+        .catch(console.error)
+      return status
+    }.bind(this))
+    .catch(collected => {
+      if (! (collected instanceof Error)) {
+        console.error('no responses: ' + collected.size)
+        throw new Error('timeout waiting for status')
+      } else {
+        console.error('error2: ' + collected)
+        throw collected
+      }
+    })
+
+  this.warrooms[roomName].sendMessage('.status')
+    .then(m => {
+      m.delete()
+        .catch(console.error)
+    })
+    .catch(console.error)
+
+  return promise
+}
+
+WarMom.prototype.getRoster = function(roomName) {
+  // get the current roster from '.list weight'
+  const filter = m => m.author.bot && m.author.username === 'wmbot' && m.content.startsWith('List all by weight')
+
+  let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
+    .then( function(collected) {
+      let response = collected.first()
+      const roster = this.parseRoster(response.content)
+      response.delete()
+        .catch(console.error)
+      return roster
+    }.bind(this))
+    .catch(collected => {
+      if (! (collected instanceof Error)) {
+        console.error('no responses: ' + collected.size)
+        throw new Error('timeout waiting for roster')
+      } else {
+        console.error('error2: ' + collected)
+        throw collected
+      }
+    })
+
+  this.warrooms[roomName].sendMessage('.list weight')
+    .then(m => {
+      m.delete()
+        .catch(console.error)
+    })
+    .catch(console.error)
+
+  return promise
+}
+
+WarMom.prototype.notifyLateAttackers = function(roomName, bothOnly) {
   // check the lineup and see who has ${attacks} attacks remaining
-  // send notifications that there is ${timeleft} to use them
-  let baseMessage = `${timeleft} left in war and you have `
+  // send notifications that there is x time left to use them
+  let baseMessage = ''
     , unnotified = []
     , unnotifiedText = null
     // , channel = this.warrooms[roomName] 
@@ -215,9 +282,7 @@ WarMom.prototype.notify = function(roomName, bothOnly, timeleft) {
 
   this.getStatus(roomName)
     .then(function(status) {
-      if (status.status === 'ends' || true) {
-        console.log(status)
-        baseMessage = ''
+      if (status.status === 'ends') {
         if (status.hours > 0) {
           baseMessage = baseMessage + `${status.hours} hours `
         }
@@ -254,36 +319,9 @@ WarMom.prototype.notify = function(roomName, bothOnly, timeleft) {
     }.bind(this))
 }
 
-WarMom.prototype.getStatus = function(roomName) {
-  // get the current war status from '.status'
-  const filter = m => m.author.bot && m.author.username === 'wmbot' && status_regex.test(m.content)
-
-  let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
-    .then( function(collected) {
-      let response = collected.first()
-      const status = this.parseStatus(response.content)
-      response.delete()
-        .catch(console.error)
-      return status
-    }.bind(this))
-    .catch(collected => {
-      if (! (collected instanceof Error)) {
-        console.error('no responses: ' + collected.size)
-        throw new Error('timeout waiting for status')
-      } else {
-        console.error('error2: ' + collected)
-        throw collected
-      }
-    })
-
-  this.warrooms[roomName].sendMessage('.status')
-    .then(m => {
-      m.delete()
-        .catch(console.error)
-    })
-    .catch(console.error)
-
-  return promise
+WarMom.prototype.notifyLineupMarch = function(msg) {
+  // notify ppl in war that marching orders are up
+  // reply with list of accounts not notified
 }
 
 WarMom.prototype.checkWar = function(roomName) {
@@ -309,7 +347,7 @@ WarMom.prototype.checkWar = function(roomName) {
           console.log('setting up notification (first chance) for ' + roomName)
           // let interval = (status.seconds + (60 * (status.minutes + (60 * (status.hours - 4))))) * 1000
           // this.addTimer(roomName, function() {
-          //   this.notify(roomName, true, '4 hours')
+          //   this.notifyLateAttackers(roomName, true)
           // }.bind(this), (interval))
         }
         // else if time left is > 2 hours, setup timer to nag at 2 hours left
@@ -317,7 +355,7 @@ WarMom.prototype.checkWar = function(roomName) {
           console.log('setting up notification (last chance) for ' + roomName)
           let interval = (status.seconds + (60 * (status.minutes + (60 * (status.hours - 2))))) * 1000
           // this.addTimer(roomName, function() {
-          //   this.notify(roomName, false, '2 hours')
+          //   this.notifyLateAttackers(roomName, false)
           // }.bind(this), interval)
         }
       }
@@ -331,39 +369,7 @@ WarMom.prototype.checkWar = function(roomName) {
     })
 }
 
-WarMom.prototype.getRoster = function(roomName) {
-  // get the current roster from '.list weight'
-  const filter = m => m.author.bot && m.author.username === 'wmbot' && m.content.startsWith('List all by weight')
-
-  let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
-    .then( function(collected) {
-      let response = collected.first()
-      const roster = this.parseRoster(response.content)
-      response.delete()
-        .catch(console.error)
-      return roster
-    }.bind(this))
-    .catch(collected => {
-      if (! (collected instanceof Error)) {
-        console.error('no responses: ' + collected.size)
-        throw new Error('timeout waiting for roster')
-      } else {
-        console.error('error2: ' + collected)
-        throw collected
-      }
-    })
-
-  this.warrooms[roomName].sendMessage('.list weight')
-    .then(m => {
-      m.delete()
-        .catch(console.error)
-    })
-    .catch(console.error)
-
-  return promise
-}
-
-WarMom.prototype.doRoster = function(msg) {
+WarMom.prototype.listClanRoster = function(msg) {
   let roomName = 'gng-warroom'
 
   this.getRoster(roomName)
@@ -383,74 +389,84 @@ WarMom.prototype.doRoster = function(msg) {
     }.bind(this))
 }
 
+WarMom.prototype.listKnownOwners = function(msg) {
+  // compile list of owners (nickname or username) and the CoC accounts they own
+}
+
+WarMom.prototype.addAccount = function(msg) {
+  const names_regex = new RegExp(/^!warmom add (.+) to (.+)$/)
+  let username = null
+    , clashid = null
+    , clashid_or_hash = null
+    , member = null
+    , match = names_regex.exec(msg.content)
+
+  if (match) {
+    clashid_or_hash = match[1]
+    username = match[2]
+    member = this.guild.members.find( member => {
+      if (member.user.username.toLowerCase() === username.toLowerCase()
+          || (member.nickname && member.nickname.toLowerCase() === username.toLowerCase())
+      ) {
+        return true
+      }
+    })
+
+    this.resolveClashID(clashid_or_hash, 'gng-warroom')
+      .then(function(clashid) {
+        if (member && clashid) {
+          let owned = this.accounts.discord.get(member.id) || []
+          if (owned.indexOf(clashid) === -1) {
+            owned.push(clashid)
+          }
+          this.accounts.discord.set(member.id, owned)
+          this.accounts.clash.set(clashid, member.id)
+
+          this.db.put('accounts.discord', Array.from(this.accounts.discord.entries()))
+          this.db.put('accounts.clash', Array.from(this.accounts.clash.entries()))
+
+          msg.channel.sendMessage(`Added ${clashid} to discord account ${member.user.username}`)
+        }
+      }.bind(this))
+  }
+}
+
+WarMom.prototype.removeOwner = function(msg) {
+  const names_regex = new RegExp(/^!warmom remove (.+)$/)
+}
+
 WarMom.prototype.onMessage = function(msg) {
   let roomName = msg.channel.name
   // return
   if (msg.content === 'The war is now active.' && msg.author.bot && Object.keys(this.warrooms).includes(roomName)) {
     // this.checkWar(roomName)
   }
-  else if (msg.content.startsWith('?warmom')) {
+  else if (msg.content.startsWith('!warmom')) {
     // confirm message sent from a warroom?
     // if (! Object.keys(this.warrooms).includes(roomName)) {
     //   msg.channel.sendMessage(badChannel)
     //   return
     // }
-    if (msg.content === '?warmom') {
+    if (msg.content === '!warmom') {
       msg.channel.sendMessage(usage)
     }
-    else if (msg.content.startsWith('?warmom add ') && msg.mentions.users.size === 0) {
-      const names_regex = new RegExp(/^\?warmom add (.+) to (.+)$/)
-      let username = null
-        , clashid = null
-        , clashid_or_hash = null
-        , member = null
-        , match = names_regex.exec(msg.content)
-
-      if (match) {
-        clashid_or_hash = match[1]
-        username = match[2]
-        member = this.guild.members.find( member => {
-          if (member.user.username.toLowerCase() === username.toLowerCase()
-              || (member.nickname && member.nickname.toLowerCase() === username.toLowerCase())
-          ) {
-            return true
-          }
-        })
-
-        this.resolveClashID(clashid_or_hash, 'gng-warroom')
-          .then(function(clashid) {
-            if (member && clashid) {
-              let owned = this.accounts.discord.get(member.id) || []
-              if (owned.indexOf(clashid) === -1) {
-                owned.push(clashid)
-              }
-              this.accounts.discord.set(member.id, owned)
-              this.accounts.clash.set(clashid, member.id)
-
-              this.db.put('accounts.discord', Array.from(this.accounts.discord.entries()))
-              this.db.put('accounts.clash', Array.from(this.accounts.clash.entries()))
-
-              msg.channel.sendMessage(`Added ${clashid} to discord account ${member.user.username}`)
-            }
-          }.bind(this))
-      }
+    else if (msg.content.startsWith('!warmom add ') && msg.mentions.users.size === 0) {
+      this.addAccount(msg)
     }
-    else if (msg.content.startsWith('?warmom add ') && msg.mentions.users.size === 1) {
+    else if (msg.content.startsWith('!warmom remove ') && msg.mentions.users.size === 0) {
+      this.removeOwner(msg)
     }
-    else if (msg.content.startsWith('?warmom remove ') && msg.mentions.users.size === 1) {
+    else if (msg.content.startsWith('!warmom list owners')) {
+      this.listKnownOwners(msg)
     }
-    else if (msg.content.startsWith('?warmom list owners')) {
-      // compile list of owners (nickname or username) and the CoC accounts they own
+    else if (msg.content.startsWith('!warmom list clan')) {
+      this.listClanRoster(msg)
     }
-    else if (msg.content.startsWith('?warmom list clan')) {
-      this.doRoster(msg)
+    else if (msg.content.startsWith('!warmom test')) {
+      this.notifyLateAttackers('fnf-warroom', false)
     }
-    else if (msg.content.startsWith('?warmom test')) {
-      this.notify('fnf-warroom', false, '2 hours')
-    }
-    else if (msg.content.startsWith('?warmom march')) {
-      // notify ppl in war that marching orders are up
-      // reply with list of accounts not notified
+    else if (msg.content.startsWith('!warmom march')) {
+      this.notifyLineupMarch(msg)
     }
     else {
       msg.channel.sendMessage('I didn\'t understand that... try typing `!warmom` for the available commands')
