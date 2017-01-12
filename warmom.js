@@ -24,6 +24,8 @@ War ended 4 minutes, 46 seconds ago
 const splitMessage = require('discord.js').splitMessage
 const Storage = require('node-storage')
 const hash = require('string-hash')
+const Logger = require('./logger.js')
+const logger = new Logger('WarMom')
 
 const base_cmd_regex = new RegExp(/^!warmom/, 'i')
 const usage_cmd_regex = new RegExp(/^!warmom\s*$/, 'i')
@@ -90,7 +92,7 @@ WarMom.prototype._addTimer = function(roomName, func, interval) {
 WarMom.prototype._warmatchErrorHandler = function(channel, messgage) {
   return e => {
     channel.sendMessage(message + '\nThere was an error retrieving information from warmatch')
-      .catch(console.error)
+      .catch(logger.error)
   }
 }
 
@@ -99,12 +101,12 @@ WarMom.prototype._sendMessage = function(channel, output) {
   if (messages instanceof Array) {
     for (let partial of messages) {
       channel.sendMessage(partial)
-        .catch(console.error)
+        .catch(logger.error)
     }
   }
   else {
     channel.sendMessage(messages)
-      .catch(console.error)
+      .catch(logger.error)
   }
 }
 
@@ -238,15 +240,15 @@ WarMom.prototype.getLineup = function(roomName) {
       let response = collected.first()
       const lineup = this.parseLineup(response.content)
       response.delete()
-        .catch(console.error)
+        .catch(logger.error)
       return lineup
     }.bind(this))
     .catch(collected => {
       if (! (collected instanceof Error)) {
-        console.error('no responses: ' + collected.size)
+        logger.error('no responses: ' + collected.size)
         throw new Error('timeout waiting for lineup')
       } else {
-        console.error('error5: ' + collected)
+        logger.error('error5: ' + collected)
         throw collected
       }
     });
@@ -254,9 +256,9 @@ WarMom.prototype.getLineup = function(roomName) {
   this.warrooms[roomName].sendMessage('.lineup')
     .then(m => {
       m.delete()
-        .catch(console.error)
+        .catch(logger.error)
     })
-    .catch(console.error)
+    .catch(logger.error)
 
   return promise
 }
@@ -269,15 +271,15 @@ WarMom.prototype.getMarchingOrders = function(roomName) {
       let response = collected.first()
       const orders = this.parseMarchingOrders(response.content)
       response.delete()
-        .catch(console.error)
+        .catch(logger.error)
       return orders
     }.bind(this))
     .catch(collected => {
       if (! (collected instanceof Error)) {
-        console.error('no responses: ' + collected.size)
+        logger.error('no responses: ' + collected.size)
         throw new Error('timeout waiting for marching orders')
      7} else {
-        console.error('error7: ' + collected)
+        logger.error('error7: ' + collected)
         throw collected
       }
     });
@@ -285,9 +287,9 @@ WarMom.prototype.getMarchingOrders = function(roomName) {
   this.warrooms[roomName].sendMessage('.march')
     .then(m => {
       m.delete()
-        .catch(console.error)
+        .catch(logger.error)
     })
-    .catch(console.error)
+    .catch(logger.error)
 
   return promise
 }
@@ -301,15 +303,15 @@ WarMom.prototype.getStatus = function(roomName) {
       let response = collected.first()
       const status = this.parseStatus(response.content)
       response.delete()
-        .catch(console.error)
+        .catch(logger.error)
       return status
     }.bind(this))
     .catch(collected => {
       if (! (collected instanceof Error)) {
-        console.error('no responses: ' + collected.size)
+        logger.error('no responses: ' + collected.size)
         throw new Error('timeout waiting for status')
       } else {
-        console.error('error2: ' + collected)
+        logger.error('error2: ' + collected)
         throw collected
       }
     })
@@ -317,9 +319,9 @@ WarMom.prototype.getStatus = function(roomName) {
   this.warrooms[roomName].sendMessage('.status')
     .then(m => {
       m.delete()
-        .catch(console.error)
+        .catch(logger.error)
     })
-    .catch(console.error)
+    .catch(logger.error)
 
   return promise
 }
@@ -333,15 +335,15 @@ WarMom.prototype.getRoster = function(roomName) {
       let response = collected.first()
       const roster = this.parseRoster(response.content)
       response.delete()
-        .catch(console.error)
+        .catch(logger.error)
       return roster
     }.bind(this))
     .catch(collected => {
       if (! (collected instanceof Error)) {
-        console.error('no responses: ' + collected.size)
+        logger.error('no responses: ' + collected.size)
         throw new Error('timeout waiting for roster')
       } else {
-        console.error('error2: ' + collected)
+        logger.error('error2: ' + collected)
         throw collected
       }
     })
@@ -349,9 +351,9 @@ WarMom.prototype.getRoster = function(roomName) {
   this.warrooms[roomName].sendMessage('.list weight')
     .then(m => {
       m.delete()
-        .catch(console.error)
+        .catch(logger.error)
     })
-    .catch(console.error)
+    .catch(logger.error)
 
   return promise
 }
@@ -464,7 +466,7 @@ WarMom.prototype.notifyMarchingOrders = function(roomName, channel) {
       }
       else {
         channel.sendMessage('There are no active wars.')
-          .catch(console.error)
+          .catch(logger.error)
       }
     }.bind(this))
     .catch(this._warmatchErrorHandler(channel, 'Notification of marching orders failed'))
@@ -480,9 +482,9 @@ WarMom.prototype.checkWar = function(roomName) {
       // - if war ended... we simply wait for msg "the war is active" => no timer
       // - if war ends... then we setup timers (4 hours and then 2 hours before war end)
       if (status.status === 'starts') {
-        console.log('war not started yet, will recheck later: ' + roomName)
         // setup timer to check status when war starts
         let interval = status.totalMilliseconds + 1000
+        logger.log(roomName + ': war not started yet. recheck in ' + interval/1000 + ' seconds')
         this._addTimer(roomName, function() {
           this.checkWar(roomName)
         }.bind(this), interval)
@@ -494,16 +496,16 @@ WarMom.prototype.checkWar = function(roomName) {
 
         // if time left is > 4 hours, setup timer to nag at 4 hours left
         if (status.hours >= 4) {
-          console.log('setting up notification (first chance) for ' + roomName)
           let interval = status.totalMilliseconds - (4 * 60 * 60 * 1000)
+          logger.log(roomName + ': setting up notification (first chance) in ' + interval/1000 + ' seconds')
           this._addTimer(roomName, function() {
             this.notifyLateAttackers(roomName, true)
           }.bind(this), interval)
         }
         // else if time left is > 2 hours, setup timer to nag at 2 hours left
         else if (status.hours >= 2) {
-          console.log('setting up notification (last chance) for ' + roomName)
           let interval = status.totalMilliseconds - (2 * 60 * 60 * 1000)
+          logger.log(roomName + ': setting up notification (last chance) in ' + interval/1000 + ' seconds')
           this._addTimer(roomName, function() {
             this.notifyLateAttackers(roomName, false)
           }.bind(this), interval)
@@ -511,7 +513,7 @@ WarMom.prototype.checkWar = function(roomName) {
       }
     }.bind(this))
     .catch(e => {
-      console.error('could not get status from warmatch')
+      logger.error('could not get status from warmatch')
       // couldn't get status from warmatch, so retry later
       let interval = 30 * 60 * 1000  // 30 minutes
       this._addTimer(roomName, function() {
@@ -699,7 +701,7 @@ WarMom.prototype.onMessage = function(msg) {
 
 WarMom.prototype.onReady = function() {
   if (!this.online) {
-    console.log('WarMom is online! ' + new Date())
+    logger.log('online!')
     this.online = true
     this.guild = this.client.guilds.find('name', this.options.guild)
     for (let roomName of Object.keys(this.options.warrooms)) {
