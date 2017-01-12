@@ -1,4 +1,7 @@
 const Cleverbot = require('cleverbot-node')
+    , Logger = require('./logger.js')
+
+const logger = new Logger('Playtime')
 
 const bangbang_regex = new RegExp(/!!+/, 'i')
     , lol_regex = new RegExp(/\b(?:lol|rofl|lmao|roflmao)\b/, 'i')
@@ -125,7 +128,7 @@ Playtime.prototype.onMessage = function(msg) {
 
 Playtime.prototype.onReady = function() {
   if (!this.online) {
-    console.log('Playtime is online! ' + new Date())
+    logger.log('Playtime is online! ' + new Date())
     this.online = true
     Cleverbot.prepare(() => {})
   }

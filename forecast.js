@@ -2,6 +2,9 @@
 const forecastURL = 'http://clashofclansforecaster.com/STATS.json'
     , Request = require('request')
     , Storage = require('node-storage')
+    , Logger = require('./logger.js')
+
+const logger = new Logger('Forecast')
 
 const statuses = [
     'EXCELLENT'
@@ -48,7 +51,7 @@ function Forecast(config, client) {
 // }
 
 Forecast.prototype.getForecast = function() {
-  console.log('polling forecast at ' + new Date())
+  logger.log('polling forecast')
 
   Request({
     url: forecastURL
@@ -58,7 +61,7 @@ Forecast.prototype.getForecast = function() {
     if (!error && response.statusCode === 200 && body.forecastMessages.english) {
       interval = this.processForecast(body.forecastMessages.english, body.forecastWordNow)
     }
-    console.log('next forecast poll in ' + (interval/1000) + ' seconds')
+    logger.log('next forecast poll in ' + (interval/1000) + ' seconds')
     setTimeout(this.getForecast.bind(this), interval)
     this.nextpoll = new Date().getTime() + interval
     this.db.put('nextpoll', this.nextpoll)
@@ -212,13 +215,13 @@ Forecast.prototype.onReady = function() {
   let nowDT = new Date().getTime()
     , interval = 1000
   if (!this.online) {
-    console.log('Forecast is online! ' + new Date())
+    logger.log('online!')
     this.online = true
     this.channel = this.client.channels.find('name', this.options.channel)
     if (this.nextpoll && nowDT < this.nextpoll) {
       interval = this.nextpoll - nowDT
     }
-    console.log('starting forecast poll in ' + (interval/1000) + ' seconds')
+    logger.log('starting forecast poll in ' + (interval/1000) + ' seconds')
     setTimeout(this.getForecast.bind(this), interval)
   }
 }

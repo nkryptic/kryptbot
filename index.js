@@ -14,12 +14,14 @@ const Discord = require('discord.js');
 const Forecast = require('./forecast.js')
 const WarMom = require('./warmom.js')
 const Playtime = require('./playtime.js')
+const Logger = require('./logger.js')
 
-console.log('initial discord client setup starting: ' + new Date())
+const logger = new Logger('kryptBot')
+logger.log('starting initial setup')
 
 var bot = new Discord.Client()
-bot.on('ready', () => { console.log('kryptBot is ready! ' + new Date()) })
-bot.on('reconnecting', () => { console.log('reconnecting to discord: ' + new Date()) })
+bot.on('ready', () => { logger.log('ready!') })
+bot.on('reconnecting', () => { logger.error('reconnecting to discord') })
 
 var forecast = new Forecast(config, bot)
 var warmom   = new WarMom(config, bot)
