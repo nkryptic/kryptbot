@@ -128,7 +128,7 @@ Playtime.prototype.onMessage = function(msg) {
 
 Playtime.prototype.onReady = function() {
   if (!this.online) {
-    logger.log('Playtime is online! ' + new Date())
+    logger.log('online!')
     this.online = true
     Cleverbot.prepare(() => {})
   }
