@@ -11,16 +11,52 @@
         "guild": "Playmakers Wanted",
         "warrooms": {
             "gng-warroom": {
-                "enabled": true,
-                "clan": "Grit N Grind"
+                "autoNotify": true,
+                "clan": "Grit N Grind",
+                "reminders": [
+                    {
+                        "time": 14400000,
+                        "bothOnly": true,
+                        "label": "No attacks used"
+                    },
+                    {
+                        "time": 7200000,
+                        "bothOnly": false,
+                        "label": "Attack(s) remaining"
+                    }
+                ]
             },
             "hnh-warroom": {
-                "enabled": true,
-                "clan": "Heart N Hustle"
+                "autoNotify": true,
+                "clan": "Heart N Hustle",
+                "reminders": [
+                    {
+                        "time": 14400000,
+                        "bothOnly": true,
+                        "label": "No attacks used"
+                    },
+                    {
+                        "time": 7200000,
+                        "bothOnly": false,
+                        "label": "Attack(s) remaining"
+                    }
+                ]
             },
             "fnf-warroom": {
-                "enabled": true,
-                "clan": "Fire N Fury"
+                "autoNotify": true,
+                "clan": "Fire N Fury",
+                "reminders": [
+                    {
+                        "time": 14400000,
+                        "bothOnly": true,
+                        "label": "No attacks used"
+                    },
+                    {
+                        "time": 7200000,
+                        "bothOnly": false,
+                        "label": "Attack(s) remaining"
+                    }
+                ]
             }
         }
     },

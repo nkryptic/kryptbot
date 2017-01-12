@@ -32,8 +32,8 @@ const usage_cmd_regex = new RegExp(/^!warmom\s*$/, 'i')
 const list_owners_cmd_regex = new RegExp(/^!warmom list owners$/, 'i')
 const list_roster_cmd_regex = new RegExp(/^!warmom list roster$/, 'i')
 const marching_orders_cmd_regex = new RegExp(/^!warmom notify march$/, 'i')
-const add_cmd_regex = new RegExp(/^!warmom add (.+) to (.+)$/, 'i')
-const remove_cmd_regex = new RegExp(/^!warmom remove (.+)$/, 'i')
+const add_cmd_regex = new RegExp(/^!warmom add +(.+) +to +(.+) *$/, 'i')
+const remove_cmd_regex = new RegExp(/^!warmom remove +(.+) *$/, 'i')
 const status_regex = new RegExp(
     'there are no active wars'
   + '|'
@@ -49,12 +49,16 @@ const lineup_regex = new RegExp(/^\d+\. TH\d+ (.+) ([12]) attacks left$/)
 const marching_regex = new RegExp(/^\d+\. TH\d+ ([^:]+): (.*)$/)
 const roster_regex = new RegExp(/^TH(\d+) (.+) \$\d+(?: k\d+)?(?: q\d+)?(?: w\d+)?$/)
 const usage = '*The WarMom commands:*' + '\n'
-  + '**`!warmom add <clashID or warmomID> to <discord username>` **- ' + '\n'
-  // + '**`!warmom remove USERNAME` **- ' + '\n'
+  + '**`!warmom list owners` ** - list Discord users with registered CoC accounts (in any clan)' + '\n'
+  + '**`!warmom list roster` ** - list clan accounts with their registered owner (or warmomID)' + '\n'
+  + '**`!warmom notify march` ** - ping marching orders to owners of clan accounts in war' + '\n'
+  + '**`!warmom add <clashID or warmomID> to <Discord username>` ** - register a clan account for a Discord user' + '\n'
   // + '**`!warmom add CLASHID` **- ' + '\n'
-  + '**`!warmom list owners` **- ' + '\n'
-  + '**`!warmom list roster` **- ' + '\n'
-  + '**`!warmom notify march` **- '
+  // + '**`!warmom remove USERNAME` **- ' + '\n'
+  // + '**```!warmom multiadd' + '\n'
+  // + '<clashID or warmomID> to <discord username>' + '\n'
+  // + '...' + '\n'
+  // + '<clashID or warmomID> to <discord username>```'
 const badChannel = 'WarMom can only be run from a war room channel'
 
 
@@ -69,24 +73,21 @@ function WarMom(config, client) {
   }
   this.warrooms = {}
   this.timers = {}
+  this.reminders = {}
   this.guild = null
   this.online = false
+
+  // make sure reminders are in descending time order
+  // for (let key of Object.keys(this.options.warrooms)) {
+  //   if (this.options.warrooms[key].reminders instanceof Array) {
+  //     this.options.warrooms[key].reminders.sort((a,b) => b.time - a.time)
+  //   }
+  // }
 
   if (this.options.enabled)  {
     this.client.on('message', this.onMessage.bind(this))
     this.client.on('ready', this.onReady.bind(this))
   }
-}
-
-WarMom.prototype._clearTimer = function(roomName) {
-  if (this.timers[roomName]) {
-    clearTimeout(this.timers[roomName])
-  }
-  this.timers[roomName] = null
-}
-
-WarMom.prototype._addTimer = function(roomName, func, interval) {
-  this.timers[roomName] = setTimeout(func, interval)
 }
 
 WarMom.prototype._warmatchErrorHandler = function(channel, messgage) {
@@ -147,6 +148,18 @@ WarMom.prototype._addAccount = function(clashid, member) {
 
   this.db.put('accounts.discord', Array.from(this.accounts.discord.entries()))
   this.db.put('accounts.clash', Array.from(this.accounts.clash.entries()))
+}
+
+WarMom.prototype._clearTimer = function(roomName) {
+  for (let t of this.timers[roomName]) {
+    clearTimeout(t)
+  }
+  this.timers[roomName] = []
+}
+
+WarMom.prototype._addTimer = function(roomName, func, interval) {
+  // save the timeout ID, so we can cancel
+  this.timers[roomName].push(setTimeout(func, interval))
 }
 
 WarMom.prototype.resolveClashID = function(clashid_or_hash, roomName) {
@@ -472,7 +485,15 @@ WarMom.prototype.notifyMarchingOrders = function(roomName, channel) {
     .catch(this._warmatchErrorHandler(channel, 'Notification of marching orders failed'))
 }
 
-WarMom.prototype.checkWar = function(roomName) {
+WarMom.prototype.checkWar = function(roomName, channel) {
+  if (! this.options.warrooms[roomName].autoNotify) {
+    return
+  }
+
+  if (channel) {
+    channel.sendMessage('Setting up war notifications')
+  }
+
   this._clearTimer(roomName)
 
   this.getStatus(roomName)
@@ -484,32 +505,29 @@ WarMom.prototype.checkWar = function(roomName) {
       if (status.status === 'starts') {
         // setup timer to check status when war starts
         let interval = status.totalMilliseconds + 1000
-        logger.log(roomName + ': war not started yet. recheck in ' + interval/1000 + ' seconds')
+        logger.log(roomName + ': upcoming war not started yet. rechecking in ' + interval/1000 + ' seconds')
         this._addTimer(roomName, function() {
           this.checkWar(roomName)
         }.bind(this), interval)
       }
       else if (status.status === 'ends') {
-        // maybe move the values to ping at into the config file?
-        // config.firstping = 4 * 60 * 60 * 1000
-        // config.secondping = 2 * 60 * 60 * 1000
+        for (let reminder of this.reminders[roomName]) {
+          let interval = status.totalMilliseconds - reminder.time
+          if (interval > 0) {
+            logger.log(roomName + ': setting up reminder "' + reminder.label + '" in ' + interval/1000 + ' seconds')
+            this._addTimer(roomName, function() {
+              this.notifyLateAttackers(roomName, true)
+            }.bind(this), interval)
+          }
+        }
+      }
+      else {
+        logger.log(roomName + ': war is over or new one not activated yet. will wait for activation via warbot')
+        let interval = 12 * 60 * 60 * 1000
+        this._addTimer(roomName, function() {
+          this.checkWar(roomName)
+        }.bind(this), interval)
 
-        // if time left is > 4 hours, setup timer to nag at 4 hours left
-        if (status.hours >= 4) {
-          let interval = status.totalMilliseconds - (4 * 60 * 60 * 1000)
-          logger.log(roomName + ': setting up notification (first chance) in ' + interval/1000 + ' seconds')
-          this._addTimer(roomName, function() {
-            this.notifyLateAttackers(roomName, true)
-          }.bind(this), interval)
-        }
-        // else if time left is > 2 hours, setup timer to nag at 2 hours left
-        else if (status.hours >= 2) {
-          let interval = status.totalMilliseconds - (2 * 60 * 60 * 1000)
-          logger.log(roomName + ': setting up notification (last chance) in ' + interval/1000 + ' seconds')
-          this._addTimer(roomName, function() {
-            this.notifyLateAttackers(roomName, false)
-          }.bind(this), interval)
-        }
       }
     }.bind(this))
     .catch(e => {
@@ -627,20 +645,21 @@ WarMom.prototype.removeOwner = function(channel, message) {
 }
 
 WarMom.prototype.onMessage = function(msg) {
-  let roomName = msg.channel.name
+  const roomName = msg.channel.name
+      , isWarRoom = Object.keys(this.warrooms).includes(roomName)
+      , isActivationMessage = m => m.content === 'The war is now active.' && m.author.bot
+      , isAdminUser = m => m.author.username === 'nkryptic' || m.author.username === 'Stacey'
+      , isTestMessage = m => (/^!warmom test/i).test(m.content) && m.author.username === 'nkryptic'
   // return
-  if (msg.content === 'The war is now active.' && msg.author.bot && Object.keys(this.warrooms).includes(roomName)) {
-    if (this.options.warrooms[roomName].enabled) {
-      this.checkWar(roomName)
-    }
+  if (isActivationMessage(msg) && isWarRoom) {
+    this.checkWar(roomName, msg.channel)
   }
-  else if (base_cmd_regex.test(msg.content) && (msg.author.username === 'nkryptic' || msg.author.username === 'Stacey')) {
+  else if (base_cmd_regex.test(msg.content) && isAdminUser(msg)) {
     // confirm message sent from a warroom?
-    if ((! Object.keys(this.warrooms).includes(roomName)) && (! (/^!warmom test/i).test(msg.content))) {
+    if (! (isWarRoom || isTestMessage(msg))) {
       msg.channel.sendMessage(badChannel)
-      return
     }
-    if (usage_cmd_regex.test(msg.content)) {
+    else if (usage_cmd_regex.test(msg.content)) {
       msg.channel.sendMessage(usage)
     }
     else if (add_cmd_regex.test(msg.content) && msg.mentions.users.size === 0) {
@@ -658,13 +677,13 @@ WarMom.prototype.onMessage = function(msg) {
     else if (marching_orders_cmd_regex.test(msg.content)) {
       this.notifyMarchingOrders(roomName, msg.channel)
     }
-    else if ((/^!warmom test/i).test(msg.content)) {
+    else if (isTestMessage(msg)) {
       const re1 = new RegExp(/^!warmom test (gng|fnf|hnh) (roster|march|attacks|war)$/, 'i')
           , match1 = re1.exec(msg.content)
           , re2 = new RegExp(/^!warmom test (gng|fnf|hnh) add/, 'i')
           , match2 = re2.exec(msg.content)
           , re3 = new RegExp(/^!warmom test owners/, 'i')
-          , match3 = re3.exec(msg.content)
+          , re4 = new RegExp(/^!warmom test usage/, 'i')
       if (match1) {
         let roomName = match1[1].toLowerCase() + '-warroom'
         let cmd = match1[2].toLowerCase()
@@ -682,12 +701,15 @@ WarMom.prototype.onMessage = function(msg) {
         }
       }
       else if (match2) {
-        let roomName = match2[1].toLowerCase() + '-warroom'
+        let room = match2[1].toLowerCase() + '-warroom'
         let cmd = msg.content.replace(re2, '!warmom add')
-        this.addAccount(roomName, msg.channel, cmd)
+        this.addAccount(room, msg.channel, cmd)
       }
-      else if (match3) {
+      else if (re3.test(msg.content)) {
         this.listKnownOwners(msg.channel)
+      }
+      else if (re4.test(msg.content)) {
+        msg.channel.sendMessage(usage)
       }
       else {
         msg.channel.sendMessage('bad test command')
@@ -704,12 +726,20 @@ WarMom.prototype.onReady = function() {
     logger.log('online!')
     this.online = true
     this.guild = this.client.guilds.find('name', this.options.guild)
+
     for (let roomName of Object.keys(this.options.warrooms)) {
       this.warrooms[roomName] = this.client.channels.find('name', roomName)
-      this.timers[roomName] = null
-      if (this.options.warrooms[roomName].enabled) {
-        this.checkWar(roomName)
+      this.timers[roomName] = []
+      this.reminders[roomName] = []
+      if (this.options.warrooms[roomName].reminders instanceof Array) {
+        for (let reminder of this.options.warrooms[roomName].reminders) {
+          this.reminders[roomName].push(Object.assign(
+              {time: 60*60*1000, bothOnly: false, label: 'default reminder'}
+            , reminder
+          ))
+        }
       }
+      this.checkWar(roomName)
     }
   }
 }
