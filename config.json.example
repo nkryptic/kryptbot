@@ -17,12 +17,12 @@
                     {
                         "time": 14400000,
                         "bothOnly": true,
-                        "label": "No attacks used"
+                        "label": "zero attacks"
                     },
                     {
                         "time": 7200000,
                         "bothOnly": false,
-                        "label": "Attack(s) remaining"
+                        "label": "attacks left"
                     }
                 ]
             },
@@ -33,12 +33,12 @@
                     {
                         "time": 14400000,
                         "bothOnly": true,
-                        "label": "No attacks used"
+                        "label": "zero attacks"
                     },
                     {
                         "time": 7200000,
                         "bothOnly": false,
-                        "label": "Attack(s) remaining"
+                        "label": "attacks left"
                     }
                 ]
             },
@@ -49,12 +49,12 @@
                     {
                         "time": 14400000,
                         "bothOnly": true,
-                        "label": "No attacks used"
+                        "label": "zero attacks"
                     },
                     {
                         "time": 7200000,
                         "bothOnly": false,
-                        "label": "Attack(s) remaining"
+                        "label": "attacks left"
                     }
                 ]
             }

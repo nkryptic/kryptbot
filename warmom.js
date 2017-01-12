@@ -29,9 +29,10 @@ const logger = new Logger('WarMom')
 
 const base_cmd_regex = new RegExp(/^!warmom/, 'i')
 const usage_cmd_regex = new RegExp(/^!warmom\s*$/, 'i')
-const list_owners_cmd_regex = new RegExp(/^!warmom list owners$/, 'i')
-const list_roster_cmd_regex = new RegExp(/^!warmom list roster$/, 'i')
+const list_owners_cmd_regex = new RegExp(/^!warmom owners$/, 'i')
+const list_roster_cmd_regex = new RegExp(/^!warmom roster$/, 'i')
 const marching_orders_cmd_regex = new RegExp(/^!warmom notify march$/, 'i')
+const status_cmd_regex = new RegExp(/^!warmom status$/, 'i')
 const add_cmd_regex = new RegExp(/^!warmom add +(.+) +to +(.+) *$/, 'i')
 const remove_cmd_regex = new RegExp(/^!warmom remove +(.+) *$/, 'i')
 const status_regex = new RegExp(
@@ -49,8 +50,9 @@ const lineup_regex = new RegExp(/^\d+\. TH\d+ (.+) ([12]) attacks left$/)
 const marching_regex = new RegExp(/^\d+\. TH\d+ ([^:]+): (.*)$/)
 const roster_regex = new RegExp(/^TH(\d+) (.+) \$\d+(?: k\d+)?(?: q\d+)?(?: w\d+)?$/)
 const usage = '*The WarMom commands:*' + '\n'
-  + '**`!warmom list owners` ** - list Discord users with registered CoC accounts (in any clan)' + '\n'
-  + '**`!warmom list roster` ** - list clan accounts with their registered owner (or warmomID)' + '\n'
+  + '**`!warmom status` ** - report war and notification/reminder status' + '\n'
+  + '**`!warmom owners` ** - list Discord users with registered CoC accounts (in any clan)' + '\n'
+  + '**`!warmom roster` ** - list clan accounts with their registered owner (or warmomID)' + '\n'
   + '**`!warmom notify march` ** - ping marching orders to owners of clan accounts in war' + '\n'
   + '**`!warmom add <clashID or warmomID> to <Discord username>` ** - register a clan account for a Discord user' + '\n'
   // + '**`!warmom add CLASHID` **- ' + '\n'
@@ -60,6 +62,10 @@ const usage = '*The WarMom commands:*' + '\n'
   // + '...' + '\n'
   // + '<clashID or warmomID> to <discord username>```'
 const badChannel = 'WarMom can only be run from a war room channel'
+const msDay = 24 * 60 * 60 * 1000
+    , msHour = 60 * 60 * 1000
+    , msMinute = 60 * 1000
+
 
 
 function WarMom(config, client) {
@@ -95,6 +101,40 @@ WarMom.prototype._warmatchErrorHandler = function(channel, messgage) {
     channel.sendMessage(message + '\nThere was an error retrieving information from warmatch')
       .catch(logger.error)
   }
+}
+
+WarMom.prototype._formatMS = function(total) {
+  const hours = Math.floor(total / msHour)
+      , minutes = Math.floor((total % msHour) / msMinute)
+  return this._formatTime(minutes, hours)
+}
+
+WarMom.prototype._formatTime = function(minutes, hours) {
+  let message
+    , part
+    , parts = []
+
+  if (hours && hours > 0) {
+    part = `${hours} hour`
+    if (hours > 1) {
+      part = part + 's'
+    }
+    parts.push(part)
+  }
+  if (minutes && minutes > 0) {
+    part = `${minutes} minute`
+    if (minutes > 1) {
+      part = part + 's'
+    }
+    parts.push(part)
+  }
+  if (parts.length === 0) {
+    message = '0 minutes'
+  }
+  else {
+    message = parts.join(', ')
+  }
+  return message
 }
 
 WarMom.prototype._sendMessage = function(channel, output) {
@@ -371,25 +411,19 @@ WarMom.prototype.getRoster = function(roomName) {
   return promise
 }
 
-WarMom.prototype.notifyLateAttackers = function(roomName, bothOnly, channel) {
+WarMom.prototype.notifyLateAttackers = function(roomName, bothOnly, channel, testing) {
   // check the lineup and see who has ${attacks} attacks remaining
   // send notifications that there is x time left to use them
   let unnotified = []
-    , baseMsg = ''
     , owned = new Map([])
+    , baseMsg
   
   channel = channel || this.warrooms[roomName]
 
   this.getStatus(roomName)
     .then(function(status) {
       if (status.status === 'ends') {
-        if (status.hours > 0) {
-          baseMsg = baseMsg + `${status.hours} hours `
-        }
-        if (status.minutes > 0) {
-          baseMsg = baseMsg + `${status.minutes} minutes `
-        }
-        baseMsg = baseMsg + 'left in war'
+        baseMsg = 'war ends in ' + this._formatTime(0, status.hours, status.minutes)
         
         this.getLineup(roomName)
           .then(function(lineup) {
@@ -399,13 +433,17 @@ WarMom.prototype.notifyLateAttackers = function(roomName, bothOnly, channel) {
               if (member) {
                 let list = owned.get(member.id) || []
                 if (list.length === 0) {
-                  if (member.nickname) {
-                    list.push('@' + member.nickname + ' ' + baseMsg)
+                  if (testing) {
+                    if (member.nickname) {
+                      list.push('@' + member.nickname + ' ' + baseMsg)
+                    }
+                    else {
+                      list.push('@' + member.user.username + ' ' + baseMsg)
+                    }
                   }
                   else {
-                    list.push('@' + member.user.username + ' ' + baseMsg)
+                    list.push(member + ' ' + baseMsg)
                   }
-                  // list.push(member + ' ' + baseMsg)
                 }
                 list.push(partial)
                 owned.set(member.id, list)
@@ -430,7 +468,7 @@ WarMom.prototype.notifyLateAttackers = function(roomName, bothOnly, channel) {
     .catch(this._warmatchErrorHandler(channel, 'Notification for unused attacks failed'))
 }
 
-WarMom.prototype.notifyMarchingOrders = function(roomName, channel) {
+WarMom.prototype.notifyMarchingOrders = function(roomName, channel, testing) {
   // notify ppl in war that marching orders are up
   // reply with list of accounts not notified
   let unnotified = []
@@ -449,13 +487,17 @@ WarMom.prototype.notifyMarchingOrders = function(roomName, channel) {
               if (member) {
                 let list = owned.get(member.id) || []
                 if (list.length === 0) {
-                  if (member.nickname) {
-                    list.push('@' + member.nickname + ' marching orders:')
+                  if (testing) {
+                    if (member.nickname) {
+                      list.push('@' + member.nickname + ' marching orders:')
+                    }
+                    else {
+                      list.push('@' + member.user.username + ' marching orders:')
+                    }
                   }
                   else {
-                    list.push('@' + member.user.username + ' marching orders:')
+                    list.push(member + ' marching orders:')
                   }
-                  // list.push(member + ' marching orders:')
                 }
                 list.push(partial)
                 owned.set(member.id, list)
@@ -492,6 +534,7 @@ WarMom.prototype.checkWar = function(roomName, channel) {
 
   if (channel) {
     channel.sendMessage('Setting up war notifications')
+      .catch(logger.error)
   }
 
   this._clearTimer(roomName)
@@ -505,7 +548,7 @@ WarMom.prototype.checkWar = function(roomName, channel) {
       if (status.status === 'starts') {
         // setup timer to check status when war starts
         let interval = status.totalMilliseconds + 1000
-        logger.log(roomName + ': upcoming war not started yet. rechecking in ' + interval/1000 + ' seconds')
+        logger.log(roomName + ': upcoming war not started yet. rechecking in ' + this._formatTime(status.minutes, status.hours))
         this._addTimer(roomName, function() {
           this.checkWar(roomName)
         }.bind(this), interval)
@@ -514,7 +557,7 @@ WarMom.prototype.checkWar = function(roomName, channel) {
         for (let reminder of this.reminders[roomName]) {
           let interval = status.totalMilliseconds - reminder.time
           if (interval > 0) {
-            logger.log(roomName + ': setting up reminder "' + reminder.label + '" in ' + interval/1000 + ' seconds')
+            logger.log(roomName + ': setting up reminder "' + reminder.label + '" to trigger in ' + this._formatMS(interval))
             this._addTimer(roomName, function() {
               this.notifyLateAttackers(roomName, true)
             }.bind(this), interval)
@@ -640,8 +683,30 @@ WarMom.prototype.addAccount = function(roomName, channel, message) {
   }
 }
 
-WarMom.prototype.removeOwner = function(channel, message) {
+WarMom.prototype.removeOwner = function(roomName, channel, message) {
   
+}
+
+WarMom.prototype.reportStatus = function(roomName, channel) {
+  // are reminders enabled for warroom?
+  // are we currently in war
+  // what reminders will be setup
+  // what reminders are currently pending
+  let clan = this.options.warrooms[roomName].clan
+    , output
+
+  if (this.options.warrooms[roomName].autoNotify && this.reminders[roomName].length) {
+    output = 'attack reminders are **enabled** for ' + clan
+
+    for (let reminder of this.reminders[roomName]) {
+      output = output + '\nreminder *' + reminder.label + '* -- sent ' + this._formatMS(reminder.time) + ' before war ends'
+    }
+  } else {
+    output = 'attack reminders are **disabled** for ' + clan
+  }
+
+  channel.sendMessage(output)
+    .catch(logger.error)
 }
 
 WarMom.prototype.onMessage = function(msg) {
@@ -662,8 +727,10 @@ WarMom.prototype.onMessage = function(msg) {
     else if (usage_cmd_regex.test(msg.content)) {
       msg.channel.sendMessage(usage)
     }
+    else if (status_cmd_regex.test(msg.content)) {
+      this.reportStatus(roomName, msg.channel)
+    }
     else if (add_cmd_regex.test(msg.content) && msg.mentions.users.size === 0) {
-      this.addAccount(roomName, msg.channel, msg.content)
     }
     else if (remove_cmd_regex.test(msg.content) && msg.mentions.users.size === 0) {
       this.removeOwner(msg.channel, msg.content)
@@ -678,7 +745,7 @@ WarMom.prototype.onMessage = function(msg) {
       this.notifyMarchingOrders(roomName, msg.channel)
     }
     else if (isTestMessage(msg)) {
-      const re1 = new RegExp(/^!warmom test (gng|fnf|hnh) (roster|march|attacks|war)$/, 'i')
+      const re1 = new RegExp(/^!warmom test (gng|fnf|hnh) (roster|march|attacks|war|status)$/, 'i')
           , match1 = re1.exec(msg.content)
           , re2 = new RegExp(/^!warmom test (gng|fnf|hnh) add/, 'i')
           , match2 = re2.exec(msg.content)
@@ -691,13 +758,16 @@ WarMom.prototype.onMessage = function(msg) {
           this.listClanRoster(roomName, msg.channel)
         }
         else if (cmd === 'march') {
-          this.notifyMarchingOrders(roomName, msg.channel)
+          this.notifyMarchingOrders(roomName, msg.channel, true)
         }
         else if (cmd === 'war') {
           this.checkWar(roomName)
         }
+        else if (cmd === 'status') {
+          this.reportStatus(roomName, msg.channel)
+        }
         else {  // cmd === 'attacks'
-          this.notifyLateAttackers(roomName, false, msg.channel)
+          this.notifyLateAttackers(roomName, false, msg.channel, true)
         }
       }
       else if (match2) {
