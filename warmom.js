@@ -731,6 +731,7 @@ WarMom.prototype.onMessage = function(msg) {
       this.reportStatus(roomName, msg.channel)
     }
     else if (add_cmd_regex.test(msg.content) && msg.mentions.users.size === 0) {
+      this.addAccount(roomName, msg.channel, msg.content)
     }
     else if (remove_cmd_regex.test(msg.content) && msg.mentions.users.size === 0) {
       this.removeOwner(msg.channel, msg.content)
