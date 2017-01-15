@@ -47,7 +47,7 @@ const status_regex = new RegExp(
   , 'm')
 // const war_regex = new RegExp(/warmatch.us\/clans\/war\/(\d+)/, 'm')
 const lineup_regex = new RegExp(/^\d+\. TH\d+ (.+) ([12]) attacks left$/)
-const marching_regex = new RegExp(/^\d+\. TH\d+ ([^:]+): (.*)$/)
+const marching_regex = new RegExp(/^\d+\. TH\d+ (.+): (.*)$/)
 const roster_regex = new RegExp(/^TH(\d+) (.+) \$\d+(?: k\d+)?(?: q\d+)?(?: w\d+)?$/)
 const usage = '*The WarMom commands:*' + '\n'
   + '**`!warmom status` ** - report war and notification/reminder status' + '\n'
