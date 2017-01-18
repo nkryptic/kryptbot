@@ -96,7 +96,7 @@ function WarMom(config, client) {
   }
 }
 
-WarMom.prototype._warmatchErrorHandler = function(channel, messgage) {
+WarMom.prototype._warmatchErrorHandler = function(channel, message) {
   return e => {
     channel.sendMessage(message + '\nThere was an error retrieving information from warmatch')
       .catch(logger.error)
