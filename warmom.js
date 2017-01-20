@@ -1,25 +1,32 @@
 /*
-!warmom add @mention CLASHID
-!warmom remove @mention CLASHID
-!warmom accounts
-!warmom nag
-!warmom naglist
-
 TODO:
-- rewrite this to listen for wmbot or ask wmbot stuff...
-- have it set timers for war 2 hours and 4 hours before the end
-  and automatically notify ppl then
-- manual version will still be available though
-
-unprompted =>
-The war is now active.
-
-.status =>
-Boop, there are no active wars.
-War starts 5 hours, 28 minutes
-War ends 18 hours, 45 minutes
-War ended 4 minutes, 46 seconds ago
-
+- consolidate code for member messages (+testing version)
+- need auto-retry on warmatch failure (interval? how many retries?)
+- notify of marching orders automatically when warmatch war is activated?
+- authz based on co-leader role?
+- new reminder system
+  - new reminders
+    23:45 hours left
+    - Ping bottom 50% having 2 attacks left
+    - message: "war has started. you marching orders are {ORDERS}"
+    21 hours left
+    - Ping bottom 50% having any attacks left
+    - message: "all of your attacks should be completed within the next 2 hours"
+    21 hours left
+    - Ping upper middle 25% having 2 attacks left
+    - message: "your first attack should be completed within the next 2 hours"
+    18 hours left
+    - Ping upper middle 25% having any attacks left
+    - message: "all of your attacks should already be completed"
+    18 hours left
+    - Ping top 25% having 2 attacks left
+    - message: "you should have already attacked once"
+    4 hours left
+    - Ping any having 2 attacks left
+    - message: "4 hours left in war, you have {N} attacks left"
+    2 hours left
+    - Ping any having any attacks left
+    - message: "2 hours left in war, you have {N} attacks left"
 */
 const splitMessage = require('discord.js').splitMessage
 const Storage = require('node-storage')
@@ -46,8 +53,8 @@ const status_regex = new RegExp(
   + '[^]*warmatch\\.us\\/clans\\/war\\/(\\d+)'
   , 'm')
 // const war_regex = new RegExp(/warmatch.us\/clans\/war\/(\d+)/, 'm')
-const lineup_regex = new RegExp(/^\d+\. TH\d+ (.+) ([12]) attacks left$/)
-const marching_regex = new RegExp(/^\d+\. TH\d+ (.+): (.*)$/)
+const lineup_regex = new RegExp(/^(\d+)\. TH\d+ (.+) ([12]) attacks left$/)
+const marching_regex = new RegExp(/^(\d+)\. TH\d+ (.+): (.*)$/)
 const roster_regex = new RegExp(/^TH(\d+) (.+) \$\d+(?: k\d+)?(?: q\d+)?(?: w\d+)?$/)
 const usage = '*The WarMom commands:*' + '\n'
   + '**`!warmom status` ** - report war and notification/reminder status' + '\n'
@@ -62,16 +69,67 @@ const usage = '*The WarMom commands:*' + '\n'
   // + '...' + '\n'
   // + '<clashID or warmomID> to <discord username>```'
 const badChannel = 'WarMom can only be run from a war room channel'
+const warmatchErrorMsg = 'There was an error retrieving information from warmatch'
 const msDay = 24 * 60 * 60 * 1000
     , msHour = 60 * 60 * 1000
     , msMinute = 60 * 1000
-
+const rosterPartitions = {
+  15: {
+    firstHalf: {min: 1, max: 7},
+    secondHalf: {min: 8, max: 15},
+    firstQuarter: {min: 1, max: 3},
+    secondQuarter: {min: 4, max: 7},
+    thirdQuarter: {min: 8, max: 10},
+    fourthQuarter: {min: 11, max: 15}
+  },
+  20: {
+    firstHalf: {min: 1, max: 10},
+    secondHalf: {min: 11, max: 20},
+    firstQuarter: {min: 1, max: 5},
+    secondQuarter: {min: 6, max: 10},
+    thirdQuarter: {min: 11, max: 15},
+    fourthQuarter: {min: 16, max: 20}
+  },
+  25: {
+    firstHalf: {min: 1, max: 12},
+    secondHalf: {min: 13, max: 25},
+    firstQuarter: {min: 1, max: 6},
+    secondQuarter: {min: 7, max: 12},
+    thirdQuarter: {min: 13, max: 18},
+    fourthQuarter: {min: 19, max: 25}
+  },
+  30: {
+    firstHalf: {min: 1, max: 15},
+    secondHalf: {min: 16, max: 30},
+    firstQuarter: {min: 1, max: 7},
+    secondQuarter: {min: 8, max: 15},
+    thirdQuarter: {min: 16, max: 22},
+    fourthQuarter: {min: 23, max: 30}
+  },
+  40: {
+    firstHalf: {min: 1, max: 20},
+    secondHalf: {min: 21, max: 40},
+    firstQuarter: {min: 1, max: 10},
+    secondQuarter: {min: 11, max: 20},
+    thirdQuarter: {min: 21, max: 30},
+    fourthQuarter: {min: 31, max: 40}
+  },
+  50: {
+    firstHalf: {min: 1, max: 25},
+    secondHalf: {min: 26, max: 50},
+    firstQuarter: {min: 1, max: 12},
+    secondQuarter: {min: 13, max: 25},
+    thirdQuarter: {min: 26, max: 37},
+    fourthQuarter: {min: 38, max: 50}
+  }
+}
 
 
 function WarMom(config, client) {
   // this.annChannel = null
   this.client = client
-  this.options = Object.assign({}, config.warmom)
+  // this.options = Object.assign({}, config.warmom)
+  this.options = JSON.parse(JSON.stringify(config.warmom))
   this.db = new Storage(this.options.db)
   this.accounts = {
       clash: new Map(this.db.get('accounts.clash') || [])
@@ -96,11 +154,9 @@ function WarMom(config, client) {
   }
 }
 
-WarMom.prototype._warmatchErrorHandler = function(channel, message) {
-  return e => {
-    channel.sendMessage(message + '\nThere was an error retrieving information from warmatch')
-      .catch(logger.error)
-  }
+WarMom.prototype._timeToMS = function(time) {
+  const total = (msHour * (time.hours || 0)) + (msMinute * (time.minutes || 0))
+  return total
 }
 
 WarMom.prototype._formatMS = function(total) {
@@ -135,6 +191,24 @@ WarMom.prototype._formatTime = function(minutes, hours) {
     message = parts.join(', ')
   }
   return message
+}
+
+WarMom.prototype._formatMemberMsg = function(member, text, testing) {
+  let output
+
+  if (testing) {
+    if (member.nickname) {
+      output = '@' + member.nickname
+    }
+    else {
+      output = '@' + member.user.username
+    }
+  }
+  else {
+    output = '' + member
+  }
+  output = output + ' ' + text
+  return output
 }
 
 WarMom.prototype._sendMessage = function(channel, output) {
@@ -232,15 +306,17 @@ WarMom.prototype.parseStatus = function(message) {
 
 WarMom.prototype.parseLineup = function(message) {
   // parse out the CoC account names and attacks
-  let lineup = []
+  let lineup = new Map()
 
   for (let line of message.split(/\r?\n/)) {
     let match = lineup_regex.exec(line)
     if (match) {
-      lineup.push({
-          discordid: this.accounts.clash.get(match[1])
-        , clashid: match[1]
-        , remaining: match[2]
+      let position = parseInt(match[1])
+      lineup.set(position, {
+          position: position
+        , discordid: this.accounts.clash.get(match[2])
+        , clashid: match[2]
+        , remaining: match[3]
       })
     }
   }
@@ -250,15 +326,17 @@ WarMom.prototype.parseLineup = function(message) {
 
 WarMom.prototype.parseMarchingOrders = function(message) {
   // parse out the CoC account names and orders
-  let orders = []
+  let orders = new Map()
 
   for (let line of message.split(/\r?\n/)) {
     let match = marching_regex.exec(line)
     if (match) {
-      orders.push({
-          discordid: this.accounts.clash.get(match[1])
-        , clashid: match[1]
-        , orders: match[2]
+      let position = parseInt(match[1])
+      orders.set(position, {
+          position: position
+        , discordid: this.accounts.clash.get(match[2])
+        , clashid: match[2]
+        , orders: match[3]
       })
     }
   }
@@ -411,7 +489,95 @@ WarMom.prototype.getRoster = function(roomName) {
   return promise
 }
 
-WarMom.prototype.notifyLateAttackers = function(roomName, bothOnly, channel, testing) {
+WarMom.prototype._mergeLineupOrders = function(lineup, orders) {
+  let results = new Map()
+  for (let [idx, entry] of lineup) {
+    let order = orders.get(idx) || {}
+      , result = {}
+    Object.assign(result, order, lineup)
+    results.set(idx, result)
+  }
+  return results
+}
+
+WarMom.prototype._handleReminder = function(roomName, reminder, status, entries, channel, testing) {
+  let unnotified = []
+    , owned = new Map([])
+    // , baseMsg
+  let range
+
+  if (reminder['filter-range']) {
+    range = rosterPartitions[entries.size][reminder['filter-range']]
+  }
+
+  for (let [idx, entry] of entries) {
+    let member = this._getMember(entry.discordid)
+      , partial = `${entry.clashid} - ${entry.remaining} attacks remaining`
+    if (member) {
+      let list = owned.get(member.id) || []
+      if (list.length === 0) {
+        list.push(this._formatMemberMsg(member, baseMsg, testing))
+      }
+      list.push(partial)
+      owned.set(member.id, list)
+    }
+    else {
+      unnotified.push(partial)
+    }
+  }
+  for (let list of owned.values()) {
+    this._sendMessage(channel, list.join('\n'))
+  }
+  if (unnotified.length > 0) {
+    let output = '\n**The following could not be pinged about pending attacks, as they are unowned:**\n'
+    output = output + unnotified.join('\n')
+    this._sendMessage(channel, output)
+  }
+}
+
+WarMom.prototype.doReminder = function(roomName, reminderIdx, channel, testing, retries) {
+  let reminder = this.reminders[roomName][reminderIdx]
+  
+  channel = channel || this.warrooms[roomName]
+
+  this.getStatus(roomName)
+    .then(function(status) {
+      if (status.status === 'ends') {
+        this.getLineup(roomName)
+          .then(function(lineup) {
+            if (reminder['include-orders']) {
+              this.getMarchingOrders(roomName)
+                .then(function(orders){
+                  let entries = this._mergeLineupOrders(lineup, orders)
+                  this._handleReminder(roomName, reminder, status, entries, channel, testing)
+                }.bind(this))
+            }
+            else {
+              this._handleReminder(roomName, reminder, status, lineup, channel, testing)
+            }
+          }.bind(this))
+      }
+    }.bind(this))
+    .catch(e => {
+      let interval = 2 * 60 * 1000  // 2 minutes
+        , retry_count = retries || 0
+      logger.error('Failed notification for unused attacks... issue with status or lineup from warmatch')
+      if ((! testing) && (retry_count < 5)) {
+        // couldn't get status from warmatch, so retry later
+        let interval = 2 * 60 * 1000  // 2 minutes
+          , retry_count = retries || 0
+        this._addTimer(roomName, function() {
+          this.notifyLateAttackers(roomName, bothOnly, undefined, false, retry_count + 1)
+        }.bind(this), interval)
+      }
+      else {
+        channel.sendMessage('Notification for unused attacks failed. ' + warmatchErrorMsg)
+          .catch(logger.error)
+      }
+    })
+}
+
+WarMom.prototype.notifyLateAttackers = function(roomName, bothOnly, channel, testing, retries) {
   // check the lineup and see who has ${attacks} attacks remaining
   // send notifications that there is x time left to use them
   let unnotified = []
@@ -427,23 +593,13 @@ WarMom.prototype.notifyLateAttackers = function(roomName, bothOnly, channel, tes
         
         this.getLineup(roomName)
           .then(function(lineup) {
-            for (let entry of lineup) {
+            for (let [idx, entry] of lineup) {
               let member = this._getMember(entry.discordid)
                 , partial = `${entry.clashid} - ${entry.remaining} attacks remaining`
               if (member) {
                 let list = owned.get(member.id) || []
                 if (list.length === 0) {
-                  if (testing) {
-                    if (member.nickname) {
-                      list.push('@' + member.nickname + ' ' + baseMsg)
-                    }
-                    else {
-                      list.push('@' + member.user.username + ' ' + baseMsg)
-                    }
-                  }
-                  else {
-                    list.push(member + ' ' + baseMsg)
-                  }
+                  list.push(this._formatMemberMsg(member, baseMsg, testing))
                 }
                 list.push(partial)
                 owned.set(member.id, list)
@@ -462,10 +618,25 @@ WarMom.prototype.notifyLateAttackers = function(roomName, bothOnly, channel, tes
             }
             // this._sendMessage(channel, output)
           }.bind(this))
-          .catch(this._warmatchErrorHandler(channel, 'Notification for unused attacks failed'))
       }
     }.bind(this))
-    .catch(this._warmatchErrorHandler(channel, 'Notification for unused attacks failed'))
+    .catch(e => {
+      let interval = 2 * 60 * 1000  // 2 minutes
+        , retry_count = retries || 0
+      logger.error('Failed notification for unused attacks... issue with status or lineup from warmatch')
+      if ((! testing) && (retry_count < 5)) {
+        // couldn't get status from warmatch, so retry later
+        let interval = 2 * 60 * 1000  // 2 minutes
+          , retry_count = retries || 0
+        this._addTimer(roomName, function() {
+          this.notifyLateAttackers(roomName, bothOnly, undefined, false, retry_count + 1)
+        }.bind(this), interval)
+      }
+      else {
+        channel.sendMessage('Notification for unused attacks failed. ' + warmatchErrorMsg)
+          .catch(logger.error)
+      }
+    })
 }
 
 WarMom.prototype.notifyMarchingOrders = function(roomName, channel, testing) {
@@ -475,29 +646,20 @@ WarMom.prototype.notifyMarchingOrders = function(roomName, channel, testing) {
     , clan = this.options.warrooms[roomName].clan
     // , output = `${clan} marching orders` + '\n'
     , owned = new Map([])
+    , baseMsg = 'marching orders:'
 
   this.getStatus(roomName)
     .then(function(status) {
       if (status.status === 'starts' || status.status === 'ends') {
         this.getMarchingOrders(roomName)
           .then(function(orders) {
-            for (let entry of orders) {
+            for (let [idx, entry] of orders) {
               let member = this._getMember(entry.discordid)
                 , partial = `${entry.clashid}: ${entry.orders}`
               if (member) {
                 let list = owned.get(member.id) || []
                 if (list.length === 0) {
-                  if (testing) {
-                    if (member.nickname) {
-                      list.push('@' + member.nickname + ' marching orders:')
-                    }
-                    else {
-                      list.push('@' + member.user.username + ' marching orders:')
-                    }
-                  }
-                  else {
-                    list.push(member + ' marching orders:')
-                  }
+                  list.push(this._formatMemberMsg(member, baseMsg, testing))
                 }
                 list.push(partial)
                 owned.set(member.id, list)
@@ -517,14 +679,16 @@ WarMom.prototype.notifyMarchingOrders = function(roomName, channel, testing) {
             }
             // this._sendMessage(channel, output)
           }.bind(this))
-          .catch(this._warmatchErrorHandler(channel, 'Notification of marching orders failed'))
       }
       else {
         channel.sendMessage('There are no active wars.')
           .catch(logger.error)
       }
     }.bind(this))
-    .catch(this._warmatchErrorHandler(channel, 'Notification of marching orders failed'))
+    .catch( e => {
+      channel.sendMessage('Notification of marching orders failed. ' + warmatchErrorMsg)
+        .catch(logger.error)
+    })
 }
 
 WarMom.prototype.checkWar = function(roomName, channel) {
@@ -554,12 +718,13 @@ WarMom.prototype.checkWar = function(roomName, channel) {
         }.bind(this), interval)
       }
       else if (status.status === 'ends') {
-        for (let reminder of this.reminders[roomName]) {
-          let interval = status.totalMilliseconds - reminder.time
+        for (let [idx, reminder] of this.reminders[roomName].entries()) {
+          let interval = status.totalMilliseconds - this._timeToMS(reminder.time)
           if (interval > 0) {
             logger.log(roomName + ': setting up reminder "' + reminder.label + '" to trigger in ' + this._formatMS(interval))
             this._addTimer(roomName, function() {
-              this.notifyLateAttackers(roomName, true)
+              // this.doReminder(roomName, idx)
+              this.notifyLateAttackers(roomName, reminder.bothOnly)
             }.bind(this), interval)
           }
         }
@@ -626,7 +791,10 @@ WarMom.prototype.listClanRoster = function(roomName, channel) {
       }
       this._sendMessage(channel, output)
     }.bind(this))
-    .catch(this._warmatchErrorHandler(channel, 'Could not get the clan roster'))
+    .catch( e => {
+      channel.sendMessage('Could not get the clan roster. ' + warmatchErrorMsg)
+        .catch(logger.error)
+    })
 }
 
 WarMom.prototype.listKnownOwners = function(channel) {
@@ -675,7 +843,10 @@ WarMom.prototype.addAccount = function(roomName, channel, message) {
             channel.sendMessage(`Could not find a CoC account with name or warmomID matching ${clashid_or_hash}`)
           }
         }.bind(this))
-        .catch(this._warmatchErrorHandler(channel, 'Could not verify the clash account'))
+        .catch( e => {
+          channel.sendMessage('Could not verify the clash account. ' + warmatchErrorMsg)
+            .catch(logger.error)
+        })
     }
     else {
       channel.sendMessage(`Could not find a discord member matching "${username}"`)
@@ -711,83 +882,90 @@ WarMom.prototype.reportStatus = function(roomName, channel) {
 
 WarMom.prototype.onMessage = function(msg) {
   const roomName = msg.channel.name
+      , authzRoleName = this.options.authzRole
       , isWarRoom = Object.keys(this.warrooms).includes(roomName)
       , isActivationMessage = m => m.content === 'The war is now active.' && m.author.bot
-      , isAdminUser = m => m.author.username === 'nkryptic' || m.author.username === 'Stacey'
+      // , isAdminUser = m => m.author.username === 'nkryptic' || m.author.username === 'Stacey'
+      , isAdminUser = m => authzRoleName && m.member.roles.exists('name', authzRoleName)
       , isTestMessage = m => (/^!warmom test/i).test(m.content) && m.author.username === 'nkryptic'
   // return
   if (isActivationMessage(msg) && isWarRoom) {
     this.checkWar(roomName, msg.channel)
   }
-  else if (base_cmd_regex.test(msg.content) && isAdminUser(msg)) {
-    // confirm message sent from a warroom?
-    if (! (isWarRoom || isTestMessage(msg))) {
-      msg.channel.sendMessage(badChannel)
-    }
-    else if (usage_cmd_regex.test(msg.content)) {
-      msg.channel.sendMessage(usage)
-    }
-    else if (status_cmd_regex.test(msg.content)) {
-      this.reportStatus(roomName, msg.channel)
-    }
-    else if (add_cmd_regex.test(msg.content) && msg.mentions.users.size === 0) {
-      this.addAccount(roomName, msg.channel, msg.content)
-    }
-    else if (remove_cmd_regex.test(msg.content) && msg.mentions.users.size === 0) {
-      this.removeOwner(msg.channel, msg.content)
-    }
-    else if (list_owners_cmd_regex.test(msg.content)) {
-      this.listKnownOwners(msg.channel)
-    }
-    else if (list_roster_cmd_regex.test(msg.content)) {
-      this.listClanRoster(roomName, msg.channel)
-    }
-    else if (marching_orders_cmd_regex.test(msg.content)) {
-      this.notifyMarchingOrders(roomName, msg.channel)
-    }
-    else if (isTestMessage(msg)) {
-      const re1 = new RegExp(/^!warmom test (gng|fnf|hnh) (roster|march|attacks|war|status)$/, 'i')
-          , match1 = re1.exec(msg.content)
-          , re2 = new RegExp(/^!warmom test (gng|fnf|hnh) add/, 'i')
-          , match2 = re2.exec(msg.content)
-          , re3 = new RegExp(/^!warmom test owners/, 'i')
-          , re4 = new RegExp(/^!warmom test usage/, 'i')
-      if (match1) {
-        let roomName = match1[1].toLowerCase() + '-warroom'
-        let cmd = match1[2].toLowerCase()
-        if (cmd === 'roster') {
-          this.listClanRoster(roomName, msg.channel)
-        }
-        else if (cmd === 'march') {
-          this.notifyMarchingOrders(roomName, msg.channel, true)
-        }
-        else if (cmd === 'war') {
-          this.checkWar(roomName)
-        }
-        else if (cmd === 'status') {
-          this.reportStatus(roomName, msg.channel)
-        }
-        else {  // cmd === 'attacks'
-          this.notifyLateAttackers(roomName, false, msg.channel, true)
-        }
+  else if (base_cmd_regex.test(msg.content)) {
+    if (isAdminUser(msg)) {
+      // confirm message sent from a warroom?
+      if (! (isWarRoom || isTestMessage(msg))) {
+        msg.channel.sendMessage(badChannel)
       }
-      else if (match2) {
-        let room = match2[1].toLowerCase() + '-warroom'
-        let cmd = msg.content.replace(re2, '!warmom add')
-        this.addAccount(room, msg.channel, cmd)
-      }
-      else if (re3.test(msg.content)) {
-        this.listKnownOwners(msg.channel)
-      }
-      else if (re4.test(msg.content)) {
+      else if (usage_cmd_regex.test(msg.content)) {
         msg.channel.sendMessage(usage)
       }
+      else if (status_cmd_regex.test(msg.content)) {
+        this.reportStatus(roomName, msg.channel)
+      }
+      else if (add_cmd_regex.test(msg.content) && msg.mentions.users.size === 0) {
+        this.addAccount(roomName, msg.channel, msg.content)
+      }
+      else if (remove_cmd_regex.test(msg.content) && msg.mentions.users.size === 0) {
+        this.removeOwner(msg.channel, msg.content)
+      }
+      else if (list_owners_cmd_regex.test(msg.content)) {
+        this.listKnownOwners(msg.channel)
+      }
+      else if (list_roster_cmd_regex.test(msg.content)) {
+        this.listClanRoster(roomName, msg.channel)
+      }
+      else if (marching_orders_cmd_regex.test(msg.content)) {
+        this.notifyMarchingOrders(roomName, msg.channel)
+      }
+      else if (isTestMessage(msg)) {
+        const re1 = new RegExp(/^!warmom test (gng|fnf|hnh) (roster|march|attacks|war|status)$/, 'i')
+            , match1 = re1.exec(msg.content)
+            , re2 = new RegExp(/^!warmom test (gng|fnf|hnh) add/, 'i')
+            , match2 = re2.exec(msg.content)
+            , re3 = new RegExp(/^!warmom test owners/, 'i')
+            , re4 = new RegExp(/^!warmom test usage/, 'i')
+        if (match1) {
+          let roomName = match1[1].toLowerCase() + '-warroom'
+          let cmd = match1[2].toLowerCase()
+          if (cmd === 'roster') {
+            this.listClanRoster(roomName, msg.channel)
+          }
+          else if (cmd === 'march') {
+            this.notifyMarchingOrders(roomName, msg.channel, true)
+          }
+          else if (cmd === 'war') {
+            this.checkWar(roomName)
+          }
+          else if (cmd === 'status') {
+            this.reportStatus(roomName, msg.channel)
+          }
+          else {  // cmd === 'attacks'
+            this.notifyLateAttackers(roomName, false, msg.channel, true)
+          }
+        }
+        else if (match2) {
+          let room = match2[1].toLowerCase() + '-warroom'
+          let cmd = msg.content.replace(re2, '!warmom add')
+          this.addAccount(room, msg.channel, cmd)
+        }
+        else if (re3.test(msg.content)) {
+          this.listKnownOwners(msg.channel)
+        }
+        else if (re4.test(msg.content)) {
+          msg.channel.sendMessage(usage)
+        }
+        else {
+          msg.channel.sendMessage('bad test command')
+        }
+      }
       else {
-        msg.channel.sendMessage('bad test command')
+        msg.channel.sendMessage('I didn\'t understand that... \n\n' + usage)
       }
     }
-    else {
-      msg.channel.sendMessage('I didn\'t understand that... \n\n' + usage)
+    else if (authzRoleName) {
+      msg.channel.sendMessage('Unauthorized... you do not have the ' + authzRoleName + ' role')
     }
   }
 }
