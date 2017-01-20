@@ -16,14 +16,30 @@
                 "clan": "Grit N Grind",
                 "reminders": [
                     {
-                        "time": 14400000,
-                        "bothOnly": true,
-                        "label": "zero attacks"
+                        "time": {
+                            "hours": 4
+                        },
+                        "filter": {
+                            "has2attacks": true
+                        },
+                        "include": {
+                            "attacksLeft": true,
+                            "timeLeft": true
+                        },
+                        "label": "Ping anyone with both attacks remaining"
                     },
                     {
-                        "time": 7200000,
-                        "bothOnly": false,
-                        "label": "attacks left"
+                        "time": {
+                            "hours": 2
+                        },
+                        "filter": {
+                            "has2attacks": false
+                        },
+                        "include": {
+                            "attacksLeft": true,
+                            "timeLeft": true
+                        },
+                        "label": "Ping anyone with attacks remaining"
                     }
                 ]
             },
@@ -32,14 +48,89 @@
                 "clan": "Heart N Hustle",
                 "reminders": [
                     {
-                        "time": 14400000,
-                        "bothOnly": true,
-                        "label": "zero attacks"
+                        "time": {
+                            "hours": 23,
+                            "minutes": 45
+                        },
+                        "filter": {
+                            "range": "secondHalf",
+                            "has2attacks": true
+                        },
+                        "include": {
+                            "orders": true
+                        },
+                        "message": "The war has begun",
+                        "label": "Ping bottom half who haven't started attacking"
                     },
                     {
-                        "time": 7200000,
-                        "bothOnly": false,
-                        "label": "attacks left"
+                        "time": {
+                            "hours": 21
+                        },
+                        "filter": {
+                            "range": "secondHalf",
+                            "has2attacks": false
+                        },
+                        "message": "all of your attacks should be completed within the next 2 hours",
+                        "label": "Ping bottom half who haven't finished attacking"
+                    },
+                    {
+                        "time": {
+                            "hours": 21
+                        },
+                        "filter": {
+                            "range": "secondQuarter",
+                            "has2attacks": true
+                        },
+                        "message": "your first attack should be completed within the next 2 hours",
+                        "label": "Ping 2nd quarter who haven't started attacking"
+                    },
+                    {
+                        "time": {
+                            "hours": 18
+                        },
+                        "filter": {
+                            "range": "secondQuarter",
+                            "has2attacks": false
+                        },
+                        "message": "all of your attacks should already be completed",
+                        "label": "Ping 2nd quarter who haven't finished attacking"
+                    },
+                    {
+                        "time": {
+                            "hours": 18
+                        },
+                        "filter": {
+                            "range": "firstQuarter",
+                            "has2attacks": true
+                        },
+                        "message": "you should have already attacked once",
+                        "label": "Ping top quarter who haven't started attacking"
+                    },
+                    {
+                        "time": {
+                            "hours": 4
+                        },
+                        "filter": {
+                            "has2attacks": true
+                        },
+                        "include": {
+                            "attacksLeft": true,
+                            "timeLeft": true
+                        },
+                        "label": "Ping anyone with both attacks remaining"
+                    },
+                    {
+                        "time": {
+                            "hours": 2
+                        },
+                        "filter": {
+                            "has2attacks": false
+                        },
+                        "include": {
+                            "attacksLeft": true,
+                            "timeLeft": true
+                        },
+                        "label": "Ping anyone with attacks remaining"
                     }
                 ]
             },
@@ -48,14 +139,30 @@
                 "clan": "Fire N Fury",
                 "reminders": [
                     {
-                        "time": 14400000,
-                        "bothOnly": true,
-                        "label": "zero attacks"
+                        "time": {
+                            "hours": 4
+                        },
+                        "filter": {
+                            "has2attacks": true
+                        },
+                        "include": {
+                            "attacksLeft": true,
+                            "timeLeft": true
+                        },
+                        "label": "Ping anyone with both attacks remaining"
                     },
                     {
-                        "time": 7200000,
-                        "bothOnly": false,
-                        "label": "attacks left"
+                        "time": {
+                            "hours": 2
+                        },
+                        "filter": {
+                            "has2attacks": false
+                        },
+                        "include": {
+                            "attacksLeft": true,
+                            "timeLeft": true
+                        },
+                        "label": "Ping anyone with attacks remaining"
                     }
                 ]
             }
@@ -64,72 +171,5 @@
     "playtime": {
         "enabled": true
     },
-    "WIP-reminders": [
-        {
-            "time": {
-                "hours": 23,
-                "minutes": 45
-            },
-            "filter-range": "secondHalf",
-            "filter-has2attacks": true,
-            "include-orders": true,
-            "message": "The war has begun",
-            "label": "Ping bottom half who haven't started attacking"
-        },
-        {
-            "time": {
-                "hours": 21
-            },
-            "filter-range": "secondHalf",
-            "filter-has2attacks": false,
-            "message": "all of your attacks should be completed within the next 2 hours",
-            "label": "Ping bottom half who haven't finished attacking"
-        },
-        {
-            "time": {
-                "hours": 21
-            },
-            "filter-range": "secondQuarter",
-            "filter-has2attacks": true,
-            "message": "your first attack should be completed within the next 2 hours",
-            "label": "Ping 2nd quarter who haven't started attacking"
-        },
-        {
-            "time": {
-                "hours": 18
-            },
-            "filter-range": "secondQuarter",
-            "filter-has2attacks": false,
-            "message": "all of your attacks should already be completed",
-            "label": "Ping 2nd quarter who haven't finished attacking"
-        },
-        {
-            "time": {
-                "hours": 18
-            },
-            "filter-range": "firstQuarter",
-            "filter-has2attacks": true,
-            "message": "you should have already attacked once",
-            "label": "Ping top quarter who haven't started attacking"
-        },
-        {
-            "time": {
-                "hours": 4
-            },
-            "filter-has2attacks": true,
-            "include-attacksLeft": true,
-            "include-timeLeft": true,
-            "label": "Ping anyone with both attacks remaining"
-        },
-        {
-            "time": {
-                "hours": 2
-            },
-            "filter-has2attacks": false,
-            "include-attacksLeft": true,
-            "include-timeLeft": true,
-            "label": "Ping anyone with attacks remaining"
-        }
-    ],
     "appClientId": "DISCORD_APP_CLIENT_ID"
 }
