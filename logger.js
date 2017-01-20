@@ -30,7 +30,7 @@ Logger.prototype._log = function(message, isError, tag) {
     tags.push(tag)
   }
   if (tags.length > 0) {
-    pre = pre + ' [' + tags.join('|') + '] '
+    pre = pre + '[' + tags.join('|') + '] '
   }
   logFunc(pre + message)
 }
