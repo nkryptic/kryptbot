@@ -12,7 +12,11 @@
         "authzRole": "Co-Leaders",
         "warrooms": {
             "gng-warroom": {
-                "autoNotify": true,
+                "autoRemind": true,
+                "autoMarch": true,
+                "autoMarchTime": {
+                    "hours": 2
+                },
                 "clan": "Grit N Grind",
                 "reminders": [
                     {
@@ -44,7 +48,11 @@
                 ]
             },
             "hnh-warroom": {
-                "autoNotify": true,
+                "autoRemind": true,
+                "autoMarch": true,
+                "autoMarchTime": {
+                    "hours": 2
+                },
                 "clan": "Heart N Hustle",
                 "reminders": [
                     {
@@ -135,7 +143,11 @@
                 ]
             },
             "fnf-warroom": {
-                "autoNotify": true,
+                "autoRemind": true,
+                "autoMarch": true,
+                "autoMarchTime": {
+                    "hours": 2
+                },
                 "clan": "Fire N Fury",
                 "reminders": [
                     {

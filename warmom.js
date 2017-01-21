@@ -1,8 +1,15 @@
 /*
 TODO:
-- add auto-notify-march to send marching orders automatically when warmatch war is activated?
-- (auto)cleanup old accounts
-- finish 'remove' command (or maybe just have a cleanup command)?
+- auto-cleanup old accounts?
+
+- when getting the roster and resolving the discord owner, check that the member has the clan role in discord
+    would need to re-add bot with admin privilege, but it could even assign the role automatically if missing
+
+- add paramter to checkWar... fromActivation, which will be set to true when called from war activation by wmbot?
+
+- how to handle friedly/arranged wars?
+    need jv to add that info to status output
+    don't send marching orders for them?
 */
 const splitMessage = require('discord.js').splitMessage
 const Storage = require('node-storage')
@@ -10,7 +17,8 @@ const hash = require('string-hash')
 const Logger = require('./logger.js')
 const logger = new Logger('WarMom')
 
-const base_cmd_regex = new RegExp(/^#warmom\b/, 'i')
+const base_cmd_text = '!warmom'
+const base_cmd_regex = new RegExp(/^/.source + base_cmd_text + /\b/.source, 'i')
 const usage_cmd_regex = new RegExp(base_cmd_regex.source + / *$/.source, 'i')
 const list_owners_cmd_regex = new RegExp(base_cmd_regex.source + / +owners *$/.source, 'i')
 const list_roster_cmd_regex = new RegExp(base_cmd_regex.source + / +roster *$/.source, 'i')
@@ -18,7 +26,9 @@ const marching_orders_cmd_regex = new RegExp(base_cmd_regex.source + / +notify +
 const status_cmd_regex = new RegExp(base_cmd_regex.source + / +status *$/.source, 'i')
 const add_cmd_regex = new RegExp(base_cmd_regex.source + / +add +(.+) +to +(.+) *$/.source, 'i')
 const remove_cmd_regex = new RegExp(base_cmd_regex.source + / +remove +(.+) *$/.source, 'i')
+const cleanup_cmd_regex = new RegExp(base_cmd_regex.source + / +cleanup *$/.source, 'i')
 const identify_cmd_regex = new RegExp(base_cmd_regex.source + / +identify +(.+) *$/.source, 'i')
+const release_cmd_regex = new RegExp(base_cmd_regex.source + / +release +(.+) *$/.source, 'i')
 const status_regex = new RegExp(
     'there are no active wars'
   + '|'
@@ -40,6 +50,8 @@ const basicUsage = '*The WarMom commands:*' + '\n'
   + '**`!warmom identify <clashID or warmomID>` ** - register a clan account to yourself'
 const authUsage = basicUsage + '\n\nAdmin-only commands:\n'
   + '**`!warmom add <clashID or warmomID> to <Discord username>` ** - register a clan account for a Discord user' + '\n'
+  + '**`!warmom remove <clashID or warmomID>` ** - unregister a clan account' + '\n'
+  + '**`!warmom cleanup` ** - remove Discord users and registered accounts that have left the server' + '\n'
   + '**`!warmom notify march` ** - ping marching orders to owners of clan accounts in war'
 const badChannel = 'WarMom can only be run from a war room channel'
 const warmatchErrorMsg = 'There was an error retrieving information from warmatch'
@@ -128,6 +140,7 @@ function WarMom(config, client) {
   this.guild = null
   this.online = false
 
+  this._validateAutoSettings()
   if (this.options.enabled)  {
     this.client.on('message', this.onMessage.bind(this))
     this.client.on('ready', this.onReady.bind(this))
@@ -230,7 +243,12 @@ WarMom.prototype._addAccount = function(clashid, member) {
   for (let [k, v] of this.accounts.discord.entries()) {
     if (k != member.id && v.indexOf(clashid) > -1) {
       v.splice(v.indexOf(clashid), 1)
-      this.accounts.discord.set(k, v)
+      if (v.length > 0) {
+        this.accounts.discord.set(k, v)
+      }
+      else {
+        this.accounts.discord.delete(k)
+      }
     }
   }
   let owned = this.accounts.discord.get(member.id) || []
@@ -242,6 +260,37 @@ WarMom.prototype._addAccount = function(clashid, member) {
 
   this.db.put('accounts.discord', Array.from(this.accounts.discord.entries()))
   this.db.put('accounts.clash', Array.from(this.accounts.clash.entries()))
+}
+
+WarMom.prototype._removeAccount = function(clashid) {
+  for (let [k, v] of this.accounts.discord.entries()) {
+    if (v.indexOf(clashid) > -1) {
+      v.splice(v.indexOf(clashid), 1)
+      if (v.length > 0) {
+        this.accounts.discord.set(k, v)
+      }
+      else {
+        this.accounts.discord.delete(k)
+      }
+    }
+  }
+  
+  this.accounts.clash.delete(clashid)
+
+  this.db.put('accounts.discord', Array.from(this.accounts.discord.entries()))
+  this.db.put('accounts.clash', Array.from(this.accounts.clash.entries()))
+}
+
+WarMom.prototype._lookupClashID = function(clashid_or_hash) {
+  let clashid
+
+  for (let k of this.accounts.clash.keys()) {
+    let uid = hash(k).toString()
+    if (k === clashid_or_hash || uid === clashid_or_hash) {
+      clashid = k
+    }
+  }
+  return clashid
 }
 
 WarMom.prototype._addReminder = function(roomName, idx, sourceReminder) {
@@ -285,6 +334,30 @@ WarMom.prototype._clearTimer = function(roomName) {
 WarMom.prototype._addTimer = function(roomName, func, interval) {
   // save the timeout ID, so we can cancel
   this.timers[roomName].push(setTimeout(func, interval))
+}
+
+WarMom.prototype._validateAutoSettings = function() {
+  const defaultTime = {hours: 1, minutes: 0}
+  let override = false
+  for (let roomName of Object.keys(this.options.warrooms)) {
+    if (this.options.warrooms[roomName].autoMarchTime) {
+      if (this.options.warrooms[roomName].autoMarchTime instanceof Object) {
+        if (! (this.options.warrooms[roomName].autoMarchTime.hours || this.options.warrooms[roomName].autoMarchTime.minutes)) {
+          override = true
+        }
+      }
+      else {
+        override = true
+      }
+    }
+    else {
+      override = true
+    }
+
+    if (override) {
+      this.options.warrooms[roomName].autoMarchTime = Object.assign({}, defaultTime)
+    }
+  }
 }
 
 WarMom.prototype.resolveClashID = function(clashid_or_hash, roomName) {
@@ -657,7 +730,7 @@ WarMom.prototype.notifyMarchingOrders = function(roomName, channel, testing) {
 }
 
 WarMom.prototype.checkWar = function(roomName, channel) {
-  if (! this.options.warrooms[roomName].autoNotify) {
+  if (! (this.options.warrooms[roomName].autoRemind || this.options.warrooms[roomName].autoMarch)) {
     return
   }
 
@@ -681,10 +754,18 @@ WarMom.prototype.checkWar = function(roomName, channel) {
           this.checkWar(roomName)
         }.bind(this), interval)
 
-        // if time until starts > autoNotifyMarch, set timer to notifyMarch?
-        // - only do this for random war?
+        // only do this for random war?  how?
+        if (this.options.warrooms[roomName].autoMarch) {
+          interval = status.totalMilliseconds - this._timeToMS(this.options.warrooms[roomName].autoMarchTime)
+          if (interval > 0) {
+            logger.log(roomName + ': auto notification of marching orders in ' + this._formatMS(interval))
+            this._addTimer(roomName, function() {
+              this.notifyMarchingOrders(roomName)
+            }.bind(this), interval)
+          }
+        }
       }
-      else if (status.status === 'ends') {
+      else if (status.status === 'ends' && this.options.warrooms[roomName].autoRemind) {
         for (let [idx, reminder] of this.reminders[roomName].entries()) {
           let interval = status.totalMilliseconds - this._timeToMS(reminder.time)
           if (interval > 0) {
@@ -732,7 +813,7 @@ WarMom.prototype.listClanRoster = function(roomName, channel) {
             else {
               name = member.user.username
             }
-            owned.push(`${entry.clashid} is owned by ${name}`)
+            owned.push(`${entry.clashid} [warmomID: ${entry.uid}] - owned by ${name}`)
           }
           else {
             unowned.push(`${entry.clashid} [warmomID: ${entry.uid}]`)
@@ -800,10 +881,10 @@ WarMom.prototype.addAccount = function(roomName, channel, message) {
         .then(function(clashid) {
           if (clashid) {
             this._addAccount(clashid, member)
-            channel.sendMessage(`Added ${clashid} to discord account ${member.user.username}`)
+            channel.sendMessage(`Registered CoC account ${clashid} to discord account ${member.user.username}`)
           }
           else {
-            channel.sendMessage(`Could not find a CoC account with name or warmomID matching ${clashid_or_hash}`)
+            channel.sendMessage(`A CoC account with name or warmomID matching ${clashid_or_hash} was not found on the roster`)
           }
         }.bind(this))
         .catch( e => {
@@ -817,10 +898,49 @@ WarMom.prototype.addAccount = function(roomName, channel, message) {
   }
 }
 
+WarMom.prototype.removeAccount = function(channel, message) {
+  let clashid = null
+    , clashid_or_hash = null
+    , match = remove_cmd_regex.exec(message)
+
+  if (match) {
+    clashid_or_hash = match[1]
+    clashid = this._lookupClashID(clashid_or_hash)
+
+    if (clashid) {
+      this._removeAccount(clashid)
+      channel.sendMessage(`Unregistered CoC account ${clashid}`)
+    }
+    else {
+      channel.sendMessage(`A CoC account with name or warmomID matching ${clashid_or_hash} was not registered`)
+    }
+  }
+}
+
+WarMom.prototype.cleanupOwners = function(channel) {
+  let clashids = []
+    , counter = 0
+  for (let [k, v] of this.accounts.discord.entries()) {
+    let member = this._getMember(k)
+    if (!member) {
+      for (let clashid of v) {
+        this.accounts.clash.delete(clashid)
+      }
+      this.accounts.discord.delete(k)
+      counter++
+    }
+  }
+
+  this.db.put('accounts.discord', Array.from(this.accounts.discord.entries()))
+  this.db.put('accounts.clash', Array.from(this.accounts.clash.entries()))
+
+  channel.sendMessage(`Removed ${counter} discord accounts`)
+}
+
 WarMom.prototype.identifyAccount = function(roomName, channel, message, member) {
   let clashid = null
     , clashid_or_hash = null
-    , match = identify_cmd_regex.exec(message)
+    , match = release_cmd_regex.exec(message)
 
   if (match) {
     clashid_or_hash = match[1]
@@ -833,11 +953,11 @@ WarMom.prototype.identifyAccount = function(roomName, channel, message, member) 
             channel.sendMessage(`${clashid} is currently claimed and will need to be released first`)
           } else {
             this._addAccount(clashid, member)
-            channel.sendMessage(`Added ${clashid} to discord account ${member.user.username}`)
+            channel.sendMessage(`Registered CoC account ${clashid} to discord account ${member.user.username}`)
           }
         }
         else {
-          channel.sendMessage(`Could not find a CoC account with name or warmomID matching ${clashid_or_hash}`)
+          channel.sendMessage(`A CoC account with name or warmomID matching ${clashid_or_hash} was not found on the roster`)
         }
       }.bind(this))
       .catch( e => {
@@ -847,8 +967,29 @@ WarMom.prototype.identifyAccount = function(roomName, channel, message, member) 
   }
 }
 
-WarMom.prototype.removeOwner = function(roomName, channel, message) {
-  
+WarMom.prototype.releaseAccount = function(roomName, channel, message, member) {
+  let clashid = null
+    , clashid_or_hash = null
+    , match = release_cmd_regex.exec(message)
+
+  if (match) {
+    clashid_or_hash = match[1]
+    clashid = this._lookupClashID(clashid_or_hash)
+
+    if (clashid) {
+      let existing = this.accounts.clash.get(clashid)
+      if (existing && existing === member.id) {
+        this._removeAccount(clashid)
+        channel.sendMessage(`Unregistered CoC account ${clashid}`)
+      }
+      else {
+        channel.sendMessage(`Cannot unregistered CoC account ${clashid}... you are not the owner`)
+      }
+    }
+    else {
+      channel.sendMessage(`A CoC account with name or warmomID matching ${clashid_or_hash} was not registered`)
+    }
+  }
 }
 
 WarMom.prototype.reportStatus = function(roomName, channel) {
@@ -857,13 +998,21 @@ WarMom.prototype.reportStatus = function(roomName, channel) {
   // what reminders will be setup
   // what reminders are currently pending
   let clan = this.options.warrooms[roomName].clan
-    , status = 'disabled'
+    , autoRemindStatus = 'disabled'
+    , autoMarchStatus = 'disabled'
+    , autoMarchTime = this._formatTime(this.options.warrooms[roomName].autoMarchTime.minutes, this.options.warrooms[roomName].autoMarchTime.hours)
     , output
 
-  if (this.options.warrooms[roomName].autoNotify) {
-    status = 'enabled'
+  if (this.options.warrooms[roomName].autoRemind) {
+    autoRemindStatus = 'enabled'
   }
-  output = `attack reminders are **${status}** for ${clan}`
+  if (this.options.warrooms[roomName].autoMarch) {
+    autoMarchStatus = 'enabled'
+  }
+  output = `${clan} warmom status`
+  output = output + '\n\n' + `auto notification of marching orders: **${autoMarchStatus}**`
+  output = output + '\n' + `- marching orders would be sent ${autoMarchTime} before war starts`
+  output = output + '\n\n' + `war attack reminders: **${autoRemindStatus}**`
   if (this.reminders[roomName].length) {
     output = output + '\nregistered reminders:'
     for (let reminder of this.reminders[roomName]) {
@@ -918,6 +1067,9 @@ WarMom.prototype.onMessage = function(msg) {
     else if (identify_cmd_regex.test(msg.content)) {
       this.identifyAccount(roomName, msg.channel, msg.content, msg.member)
     }
+    else if (release_cmd_regex.test(msg.content)) {
+      // this.releaseAccount(roomName, msg.channel, msg.content, msg.member)
+    }
     else if (add_cmd_regex.test(msg.content)) {
       if (isAdminUser(msg)) {
         this.addAccount(roomName, msg.channel, msg.content)
@@ -928,7 +1080,15 @@ WarMom.prototype.onMessage = function(msg) {
     }
     else if (remove_cmd_regex.test(msg.content)) {
       if (isAdminUser(msg)) {
-        this.removeOwner(msg.channel, msg.content)
+        this.removeAccount(msg.channel, msg.content)
+      }
+      else {
+        unauthorized = true
+      }
+    }
+    else if (cleanup_cmd_regex.test(msg.content)) {
+      if (isAdminUser(msg)) {
+        this.cleanupOwners(msg.channel)
       }
       else {
         unauthorized = true
@@ -944,9 +1104,9 @@ WarMom.prototype.onMessage = function(msg) {
     }
     else if (isTestMessage(msg)) {
       const list_owners_cmd_regex = new RegExp(base_cmd_regex.source + / +owners *$/.source, 'i')
-      const re1 = new RegExp(base_cmd_regex.source + / +test (gng|fnf|hnh) (roster|march|war|status)$/.source, 'i')
+      const re1 = new RegExp(base_cmd_regex.source + / +test (gng|fnf|hnh) (roster|march|war|status|cleanup)$/.source, 'i')
           , match1 = re1.exec(msg.content)
-          , re2 = new RegExp(base_cmd_regex.source + / +test (gng|fnf|hnh) add/.source, 'i')
+          , re2 = new RegExp(base_cmd_regex.source + / +test (gng|fnf|hnh) (add|remove)/.source, 'i')
           , match2 = re2.exec(msg.content)
           , re3 = new RegExp(base_cmd_regex.source + / +test (gng|fnf|hnh) reminder (\d+)$/.source, 'i')
           , match3 = re3.exec(msg.content)
@@ -965,14 +1125,23 @@ WarMom.prototype.onMessage = function(msg) {
         else if (cmd === 'war') {
           this.checkWar(roomName)
         }
+        else if (cmd === 'cleanup') {
+          this.cleanupOwners(msg.channel)
+        }
         else {  // cmd === 'status'
           this.reportStatus(roomName, msg.channel)
         }
       }
       else if (match2) {
         let room = match2[1].toLowerCase() + '-warroom'
-        let cmd = msg.content.replace(re2, '#warmom add')
-        this.addAccount(room, msg.channel, cmd)
+        let action = match2[2]
+        let cmd = msg.content.replace(re2, base_cmd_text + ' ' + action)
+        if (action === 'add') {
+          this.addAccount(room, msg.channel, cmd)
+        }
+        else {  // action === 'remove'
+          this.removeAccount(msg.channel, cmd)
+        }
       }
       else if (match3) {
         let room = match3[1].toLowerCase() + '-warroom'
