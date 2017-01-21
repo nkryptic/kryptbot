@@ -940,7 +940,7 @@ WarMom.prototype.cleanupOwners = function(channel) {
 WarMom.prototype.identifyAccount = function(roomName, channel, message, member) {
   let clashid = null
     , clashid_or_hash = null
-    , match = release_cmd_regex.exec(message)
+    , match = identify_cmd_regex.exec(message)
 
   if (match) {
     clashid_or_hash = match[1]
