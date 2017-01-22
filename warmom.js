@@ -729,7 +729,7 @@ WarMom.prototype.notifyMarchingOrders = function(roomName, channel, testing) {
   this.doReminder(roomName, reminder, channel, testing)
 }
 
-WarMom.prototype.checkWar = function(roomName, channel) {
+WarMom.prototype.checkWar = function(roomName, justActivated, channel) {
   if (! (this.options.warrooms[roomName].autoRemind || this.options.warrooms[roomName].autoMarch)) {
     return
   }
@@ -757,7 +757,8 @@ WarMom.prototype.checkWar = function(roomName, channel) {
         // only do this for random war?  how?
         if (this.options.warrooms[roomName].autoMarch) {
           interval = status.totalMilliseconds - this._timeToMS(this.options.warrooms[roomName].autoMarchTime)
-          if (interval > 0) {
+          if (interval > 0 || justActivated) {
+            interval = (interval > 0) ? interval : 2000
             logger.log(roomName + ': auto notification of marching orders in ' + this._formatMS(interval))
             this._addTimer(roomName, function() {
               this.notifyMarchingOrders(roomName)
@@ -788,7 +789,7 @@ WarMom.prototype.checkWar = function(roomName, channel) {
       logger.error('could not get status from warmatch')
       // couldn't get status from warmatch, so retry later
       this._addTimer(roomName, function() {
-        this.checkWar(roomName)
+        this.checkWar(roomName, justActivated)
       }.bind(this), retryInfo.checkWarErrorInterval)
     })
 }
@@ -1041,7 +1042,7 @@ WarMom.prototype.onMessage = function(msg) {
       , unauthorized = false
 
   if (isActivationMessage(msg) && isWarRoom) {
-    this.checkWar(roomName, msg.channel)
+    this.checkWar(roomName, true, msg.channel)
   }
   else if (base_cmd_regex.test(msg.content)) {
     if (! (isWarRoom || isTestMessage(msg))) {
