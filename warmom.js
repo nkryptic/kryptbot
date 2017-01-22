@@ -734,11 +734,6 @@ WarMom.prototype.checkWar = function(roomName, justActivated, channel) {
     return
   }
 
-  if (channel) {
-    channel.sendMessage('Setting up war notifications')
-      .catch(logger.error)
-  }
-
   this._clearTimer(roomName)
 
   this.getStatus(roomName)
@@ -760,6 +755,10 @@ WarMom.prototype.checkWar = function(roomName, justActivated, channel) {
           if (interval > 0 || justActivated) {
             interval = (interval > 0) ? interval : 2000
             logger.log(roomName + ': auto notification of marching orders in ' + this._formatMS(interval))
+            if (channel && justActivated) {
+              channel.sendMessage('Marching orders will be sent to roster in ' + this._formatMS(interval))
+                .catch(logger.error)
+            }
             this._addTimer(roomName, function() {
               this.notifyMarchingOrders(roomName)
             }.bind(this), interval)
