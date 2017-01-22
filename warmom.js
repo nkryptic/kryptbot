@@ -744,7 +744,7 @@ WarMom.prototype.checkWar = function(roomName, justActivated, channel) {
       if (status.status === 'starts') {
         // setup timer to check status when war starts
         let interval = status.totalMilliseconds + 1000
-        logger.log(roomName + ': upcoming war not started yet. rechecking in ' + this._formatTime(status.minutes, status.hours))
+        logger.log(roomName + ': upcoming war not started yet. rechecking to set up reminders in ' + this._formatTime(status.minutes, status.hours))
         this._addTimer(roomName, function() {
           this.checkWar(roomName)
         }.bind(this), interval)
