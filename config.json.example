@@ -67,7 +67,7 @@
                         "include": {
                             "orders": true
                         },
-                        "message": "The war has begun",
+                        "message": "the war is already underway...",
                         "label": "Ping bottom half who haven't started attacking"
                     },
                     {
@@ -77,6 +77,9 @@
                         "filter": {
                             "range": "secondHalf",
                             "has2attacks": false
+                        },
+                        "include": {
+                            "attacksLeft": true
                         },
                         "message": "all of your attacks should be completed within the next 2 hours",
                         "label": "Ping bottom half who haven't finished attacking"
@@ -89,6 +92,9 @@
                             "range": "secondQuarter",
                             "has2attacks": true
                         },
+                        "include": {
+                            "attacksLeft": true
+                        },
                         "message": "your first attack should be completed within the next 2 hours",
                         "label": "Ping 2nd quarter who haven't started attacking"
                     },
@@ -100,6 +106,9 @@
                             "range": "secondQuarter",
                             "has2attacks": false
                         },
+                        "include": {
+                            "attacksLeft": true
+                        },
                         "message": "all of your attacks should already be completed",
                         "label": "Ping 2nd quarter who haven't finished attacking"
                     },
@@ -110,6 +119,9 @@
                         "filter": {
                             "range": "firstQuarter",
                             "has2attacks": true
+                        },
+                        "include": {
+                            "attacksLeft": true
                         },
                         "message": "you should have already attacked once",
                         "label": "Ping top quarter who haven't started attacking"

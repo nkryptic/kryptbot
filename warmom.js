@@ -209,12 +209,12 @@ WarMom.prototype._sendMessage = function(channel, output) {
   if (messages instanceof Array) {
     for (let partial of messages) {
       channel.sendMessage(partial)
-        .catch(logger.error)
+        .catch(logger.error.bind(logger))
     }
   }
   else {
     channel.sendMessage(messages)
-      .catch(logger.error)
+      .catch(logger.error.bind(logger))
   }
 }
 
@@ -453,9 +453,9 @@ WarMom.prototype.getLineup = function(roomName) {
   let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
     .then( function(collected) {
       let response = collected.first()
-      const lineup = this.parseLineup(response.content)
       response.delete()
-        .catch(logger.error)
+        .catch(logger.error.bind(logger))
+      const lineup = this.parseLineup(response.content)
       return lineup
     }.bind(this))
     .catch(collected => {
@@ -471,9 +471,9 @@ WarMom.prototype.getLineup = function(roomName) {
   this.warrooms[roomName].sendMessage('.lineup')
     .then(m => {
       m.delete()
-        .catch(logger.error)
+        .catch(logger.error.bind(logger))
     })
-    .catch(logger.error)
+    .catch(logger.error.bind(logger))
 
   return promise
 }
@@ -484,9 +484,9 @@ WarMom.prototype.getMarchingOrders = function(roomName) {
   let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
     .then( function(collected) {
       let response = collected.first()
-      const orders = this.parseMarchingOrders(response.content)
       response.delete()
-        .catch(logger.error)
+        .catch(logger.error.bind(logger))
+      const orders = this.parseMarchingOrders(response.content)
       return orders
     }.bind(this))
     .catch(collected => {
@@ -502,9 +502,9 @@ WarMom.prototype.getMarchingOrders = function(roomName) {
   this.warrooms[roomName].sendMessage('.march')
     .then(m => {
       m.delete()
-        .catch(logger.error)
+        .catch(logger.error.bind(logger))
     })
-    .catch(logger.error)
+    .catch(logger.error.bind(logger))
 
   return promise
 }
@@ -516,9 +516,9 @@ WarMom.prototype.getStatus = function(roomName) {
   let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
     .then( function(collected) {
       let response = collected.first()
-      const status = this.parseStatus(response.content)
       response.delete()
-        .catch(logger.error)
+        .catch(logger.error.bind(logger))
+      const status = this.parseStatus(response.content)
       return status
     }.bind(this))
     .catch(collected => {
@@ -534,9 +534,9 @@ WarMom.prototype.getStatus = function(roomName) {
   this.warrooms[roomName].sendMessage('.status')
     .then(m => {
       m.delete()
-        .catch(logger.error)
+        .catch(logger.error.bind(logger))
     })
-    .catch(logger.error)
+    .catch(logger.error.bind(logger))
 
   return promise
 }
@@ -548,9 +548,9 @@ WarMom.prototype.getRoster = function(roomName) {
   let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
     .then( function(collected) {
       let response = collected.first()
-      const roster = this.parseRoster(response.content)
       response.delete()
-        .catch(logger.error)
+        .catch(logger.error.bind(logger))
+      const roster = this.parseRoster(response.content)
       return roster
     }.bind(this))
     .catch(collected => {
@@ -566,9 +566,9 @@ WarMom.prototype.getRoster = function(roomName) {
   this.warrooms[roomName].sendMessage('.list weight')
     .then(m => {
       m.delete()
-        .catch(logger.error)
+        .catch(logger.error.bind(logger))
     })
-    .catch(logger.error)
+    .catch(logger.error.bind(logger))
 
   return promise
 }
@@ -590,7 +590,7 @@ WarMom.prototype._handleReminder = function(roomName, reminder, status, entries,
     // , baseMsg
     , minAttacks = 1
     , range = {}
-    , sharedMessages = []
+    , warTimeMsg = ''
 
   if (reminder.filter.range) {
     if (Object.keys(rosterPartitions).includes(entries.size)) {
@@ -601,34 +601,44 @@ WarMom.prototype._handleReminder = function(roomName, reminder, status, entries,
     minAttacks = 2
   }
 
-  if (reminder.message) {
-    sharedMessages.push(reminder.message)
-  }
   if (reminder.include.timeLeft) {
-    sharedMessages.push('war ends in ' + this._formatTime(status.minutes, status.hours))
+    warTimeMsg = 'war ends in ' + this._formatTime(status.minutes, status.hours)
   }
 
   for (let [idx, entry] of entries) {
     skip = false
-    if (entry.remaining < minAttacks) {
+    if ((!entry.remaining) || entry.remaining < minAttacks) {
       skip = true
     }
     if ((range.min && entry.position < range.min) || (range.max && entry.position > range.max)) {
       skip = true
     }
 
+    /*
+        @discordacct - TIME LEFT IN WAR...
+        1. CLASHID: some message...`
+          marching orders: orders go here...`
+          attacks remaining: 1 or 2`
+    */
     if (!skip) {
       let member = this._getMember(entry.discordid)
       if (member) {
-        let data = owned.get(member.id) || {orders: [], attacksLeft: []}
+        let data = owned.get(member.id) || {messages: []}
+        let acctTxt = `**${entry.position}. ${entry.clashid}**`
         if (!data.member) {
           data.member = member
         }
+        if (reminder.message) {
+          data.messages.push(`${acctTxt}: *${reminder.message}*`)
+        }
+        else {
+          data.messages.push(acctTxt)
+        }
         if (reminder.include.orders && entry.orders) {
-          data.orders.push(`${entry.clashid}: ${entry.orders}`)
+          data.messages.push('\t- marching orders: ' + entry.orders)
         }
         if (reminder.include.attacksLeft) {
-          data.attacksLeft.push(`${entry.clashid} - ${entry.remaining} attacks remaining`)
+          data.messages.push('\t- attacks remaining: ' + entry.remaining)
         }
         owned.set(member.id, data)
       }
@@ -637,24 +647,20 @@ WarMom.prototype._handleReminder = function(roomName, reminder, status, entries,
       }
     }
   }
+
+  channel.sendMessage('Starting notifications for reminder *' + reminder.label + '*')
+    .catch(logger.error.bind(logger))
+
   for (let data of owned.values()) {
-    let messages = sharedMessages.slice(0)
+    let messages = [warTimeMsg]
       , output
 
-    if (data.orders.length > 0) {
-      messages.push('marching orders:')
-      messages = messages.concat(data.orders)
-    }
-    if (data.attacksLeft.length > 0) {
-      messages.push('attacks remaining:')
-      messages = messages.concat(data.attacksLeft)
-    }
-
+    messages = messages.concat(data.messages)
     output = this._formatMemberMsg(data.member, messages.join('\n'), testing)
     this._sendMessage(channel, output)
   }
   if (unnotified.length > 0) {
-    let output = '\n**The following could not be reminded, as they are unowned:**\n'
+    let output = '\n**The following could not be notified, as they are unowned:**\n'
     output = output + unnotified.join('\n')
     this._sendMessage(channel, output)
   }
@@ -705,7 +711,7 @@ WarMom.prototype.doReminder = function(roomName, reminderIdx, channel, testing, 
         }
         else {
           channel.sendMessage(`Failed to send reminder *${reminder.label}*` + warmatchErrorMsg)
-            .catch(logger.error)
+            .catch(logger.error.bind(logger))
         }
       })
   }
@@ -713,7 +719,7 @@ WarMom.prototype.doReminder = function(roomName, reminderIdx, channel, testing, 
     logger.error(`Reminder #${reminderIdx} does not exists for ${roomName}`)
     if (testing) {
       channel.sendMessage(`Reminder #${reminderIdx} does not exists for ${roomName}`)
-        .catch(logger.error)
+        .catch(logger.error.bind(logger))
     }
   }
 }
@@ -757,7 +763,7 @@ WarMom.prototype.checkWar = function(roomName, justActivated, channel) {
             logger.log(roomName + ': auto notification of marching orders in ' + this._formatMS(interval))
             if (channel && justActivated) {
               channel.sendMessage('Marching orders will be sent to roster in ' + this._formatMS(interval))
-                .catch(logger.error)
+                .catch(logger.error.bind(logger))
             }
             this._addTimer(roomName, function() {
               this.notifyMarchingOrders(roomName)
@@ -837,7 +843,7 @@ WarMom.prototype.listClanRoster = function(roomName, channel) {
     }.bind(this))
     .catch( e => {
       channel.sendMessage('Could not get the clan roster. ' + warmatchErrorMsg)
-        .catch(logger.error)
+        .catch(logger.error.bind(logger))
     })
 }
 
@@ -882,18 +888,21 @@ WarMom.prototype.addAccount = function(roomName, channel, message) {
           if (clashid) {
             this._addAccount(clashid, member)
             channel.sendMessage(`Registered CoC account ${clashid} to discord account ${member.user.username}`)
+              .catch(logger.error.bind(logger))
           }
           else {
             channel.sendMessage(`A CoC account with name or warmomID matching ${clashid_or_hash} was not found on the roster`)
+              .catch(logger.error.bind(logger))
           }
         }.bind(this))
         .catch( e => {
           channel.sendMessage('Could not verify the clash account. ' + warmatchErrorMsg)
-            .catch(logger.error)
+            .catch(logger.error.bind(logger))
         })
     }
     else {
       channel.sendMessage(`Could not find a discord member matching "${username}"`)
+        .catch(logger.error.bind(logger))
     }
   }
 }
@@ -910,9 +919,11 @@ WarMom.prototype.removeAccount = function(channel, message) {
     if (clashid) {
       this._removeAccount(clashid)
       channel.sendMessage(`Unregistered CoC account ${clashid}`)
+        .catch(logger.error.bind(logger))
     }
     else {
       channel.sendMessage(`A CoC account with name or warmomID matching ${clashid_or_hash} was not registered`)
+        .catch(logger.error.bind(logger))
     }
   }
 }
@@ -935,6 +946,7 @@ WarMom.prototype.cleanupOwners = function(channel) {
   this.db.put('accounts.clash', Array.from(this.accounts.clash.entries()))
 
   channel.sendMessage(`Removed ${counter} discord accounts`)
+    .catch(logger.error.bind(logger))
 }
 
 WarMom.prototype.identifyAccount = function(roomName, channel, message, member) {
@@ -951,18 +963,21 @@ WarMom.prototype.identifyAccount = function(roomName, channel, message, member) 
           let existing = this.accounts.clash.get(clashid)
           if (existing && existing !== member.id) {
             channel.sendMessage(`${clashid} is currently claimed and will need to be released first`)
+              .catch(logger.error.bind(logger))
           } else {
             this._addAccount(clashid, member)
             channel.sendMessage(`Registered CoC account ${clashid} to discord account ${member.user.username}`)
+              .catch(logger.error.bind(logger))
           }
         }
         else {
           channel.sendMessage(`A CoC account with name or warmomID matching ${clashid_or_hash} was not found on the roster`)
+            .catch(logger.error.bind(logger))
         }
       }.bind(this))
       .catch( e => {
         channel.sendMessage('Could not verify the clash account. ' + warmatchErrorMsg)
-          .catch(logger.error)
+          .catch(logger.error.bind(logger))
       })
   }
 }
@@ -981,13 +996,16 @@ WarMom.prototype.releaseAccount = function(roomName, channel, message, member) {
       if (existing && existing === member.id) {
         this._removeAccount(clashid)
         channel.sendMessage(`Unregistered CoC account ${clashid}`)
+          .catch(logger.error.bind(logger))
       }
       else {
         channel.sendMessage(`Cannot unregistered CoC account ${clashid}... you are not the owner`)
+          .catch(logger.error.bind(logger))
       }
     }
     else {
       channel.sendMessage(`A CoC account with name or warmomID matching ${clashid_or_hash} was not registered`)
+        .catch(logger.error.bind(logger))
     }
   }
 }
@@ -1027,7 +1045,7 @@ WarMom.prototype.reportStatus = function(roomName, channel) {
   }
   
   channel.sendMessage(output)
-    .catch(logger.error)
+    .catch(logger.error.bind(logger))
 }
 
 WarMom.prototype.onMessage = function(msg) {
@@ -1046,13 +1064,16 @@ WarMom.prototype.onMessage = function(msg) {
   else if (base_cmd_regex.test(msg.content)) {
     if (! (isWarRoom || isTestMessage(msg))) {
       msg.channel.sendMessage(badChannel)
+        .catch(logger.error.bind(logger))
     }
     else if (usage_cmd_regex.test(msg.content)) {
       if (isAdminUser(msg)) {
         msg.channel.sendMessage(authUsage)
+          .catch(logger.error.bind(logger))
       }
       else {
         msg.channel.sendMessage(basicUsage)
+          .catch(logger.error.bind(logger))
       }
     }
     else if (status_cmd_regex.test(msg.content)) {
@@ -1153,24 +1174,30 @@ WarMom.prototype.onMessage = function(msg) {
       }
       else if (re5.test(msg.content)) {
         msg.channel.sendMessage(basicUsage)
+          .catch(logger.error.bind(logger))
       }
       else if (re6.test(msg.content)) {
         msg.channel.sendMessage(authUsage)
+          .catch(logger.error.bind(logger))
       }
       else {
         msg.channel.sendMessage('bad test command')
+          .catch(logger.error.bind(logger))
       }
     }
     else {
       if (isAdminUser(msg)) {
         msg.channel.sendMessage('I didn\'t understand that... \n\n' + authUsage)
+          .catch(logger.error.bind(logger))
       }
       else {
         msg.channel.sendMessage('I didn\'t understand that... \n\n' + basicUsage)
+          .catch(logger.error.bind(logger))
       }
     }
     if (unauthorized) {
       msg.channel.sendMessage('Unauthorized... you must have the ' + authzRoleName + ' role')
+        .catch(logger.error.bind(logger))
     }
   }
 }
