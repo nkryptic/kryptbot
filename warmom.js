@@ -40,7 +40,7 @@ const status_regex = new RegExp(
   + '[^]*warmatch\\.us\\/clans\\/war\\/(\\d+)'
   , 'm')
 // const war_regex = new RegExp(/warmatch.us\/clans\/war\/(\d+)/, 'm')
-const lineup_regex = new RegExp(/^(\d+)\. TH\d+ (.+) ([12]) attacks left$/)
+const lineup_regex = new RegExp(/^(\d+)\. TH\d+ (.+) (?:([12]) attacks left|done)$/)
 const marching_regex = new RegExp(/^(\d+)\. TH\d+ (.+): (.*)$/)
 const roster_regex = new RegExp(/^TH(\d+) (.+) \$\d+(?: k\d+)?(?: q\d+)?(?: w\d+)?$/)
 const basicUsage = '*The WarMom commands:*' + '\n'
@@ -400,7 +400,7 @@ WarMom.prototype.parseLineup = function(message) {
           position: position
         , discordid: this.accounts.clash.get(match[2])
         , clashid: match[2]
-        , remaining: match[3]
+        , remaining: parseInt(match[3] || 0)
       })
     }
   }
