@@ -891,7 +891,10 @@ WarMom.prototype.addAccount = function(roomName, channel, message) {
               .catch(logger.error.bind(logger))
           }
           else {
-            channel.sendMessage(`A CoC account with name or warmomID matching ${clashid_or_hash} was not found on the roster`)
+            channel.sendMessage(
+                `**Oops...** A CoC account with name or warmomID matching ${clashid_or_hash} was not found on the roster` + '\n'
+                + 'find the correct warmomID or name by running the `' + base_cmd_text + ' roster` command'
+              )
               .catch(logger.error.bind(logger))
           }
         }.bind(this))
@@ -922,7 +925,10 @@ WarMom.prototype.removeAccount = function(channel, message) {
         .catch(logger.error.bind(logger))
     }
     else {
-      channel.sendMessage(`A CoC account with name or warmomID matching ${clashid_or_hash} was not registered`)
+      channel.sendMessage(
+          `**Oops...** A CoC account with name or warmomID matching ${clashid_or_hash} was not registered` + '\n'
+          + 'find the correct warmomID or name by running the `' + base_cmd_text + ' roster` command'
+        )
         .catch(logger.error.bind(logger))
     }
   }
@@ -971,7 +977,10 @@ WarMom.prototype.identifyAccount = function(roomName, channel, message, member) 
           }
         }
         else {
-          channel.sendMessage(`A CoC account with name or warmomID matching ${clashid_or_hash} was not found on the roster`)
+          channel.sendMessage(
+              `**Oops...** A CoC account with name or warmomID matching ${clashid_or_hash} was not found on the roster` + '\n'
+              + 'find the correct warmomID or name by running the `' + base_cmd_text + ' roster` command'
+            )
             .catch(logger.error.bind(logger))
         }
       }.bind(this))
@@ -1004,7 +1013,9 @@ WarMom.prototype.releaseAccount = function(roomName, channel, message, member) {
       }
     }
     else {
-      channel.sendMessage(`A CoC account with name or warmomID matching ${clashid_or_hash} was not registered`)
+      channel.sendMessage(
+          `**Oops...** A CoC account with name or warmomID matching ${clashid_or_hash} was not registered` + '\n'
+          + 'find the correct warmomID or name by running the `' + base_cmd_text + ' roster` command')
         .catch(logger.error.bind(logger))
     }
   }
