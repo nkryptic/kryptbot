@@ -573,7 +573,7 @@ WarMom.prototype._mergeLineupOrders = function(lineup, orders) {
   for (let [idx, entry] of lineup) {
     let order = orders.get(idx) || {}
       , result = {}
-    Object.assign(result, order, lineup)
+    Object.assign(result, order, entry)
     results.set(idx, result)
   }
   return results
