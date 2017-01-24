@@ -2,11 +2,6 @@
 TODO:
 - auto-cleanup old accounts?
 
-- when getting the roster and resolving the discord owner, check that the member has the clan role in discord
-    would need to re-add bot with admin privilege, but it could even assign the role automatically if missing
-
-- add paramter to checkWar... fromActivation, which will be set to true when called from war activation by wmbot?
-
 - how to handle friedly/arranged wars?
     need jv to add that info to status output
     don't send marching orders for them?
@@ -803,23 +798,29 @@ WarMom.prototype.listClanRoster = function(roomName, channel) {
   this.getRoster(roomName)
     .then(function(roster) {
       let clan = this.options.warrooms[roomName].clan
+        , clanRole = this.options.warrooms[roomName].clanRole
         , output = `${clan} roster`
         , owned = []
         , unowned = []
+        , missingRoleExists = false
 
       if (roster.length > 0) {
         for (let entry of roster) {
           let member = this._getMember(entry.discordid)
-            , name
+            , memberText
             , partial = ''
           if (member) {
             if (member.nickname) {
-              name = member.nickname
+              memberText = member.nickname
             }
             else {
-              name = member.user.username
+              memberText = member.user.username
             }
-            owned.push(`${entry.clashid} [warmomID: ${entry.uid}] - owned by ${name}`)
+            if (! member.roles.exists('name', clanRole)) {
+              memberText = memberText + ' :warning:'
+              missingRoleExists = true
+            }
+            owned.push(`${entry.clashid} [warmomID: ${entry.uid}] - owned by ${memberText}`)
           }
           else {
             unowned.push(`${entry.clashid} [warmomID: ${entry.uid}]`)
@@ -829,6 +830,9 @@ WarMom.prototype.listClanRoster = function(roomName, channel) {
           owned.sort()
           output = output + '\n\n**owned accounts**\n'
           output = output + owned.join('\n')
+          if (missingRoleExists) {
+            output = output + '\nUsers with a :warning: icon are missing the clan role (' + clanRole + ')'
+          }
         }
         if (unowned.length > 0) {
           unowned.sort()
