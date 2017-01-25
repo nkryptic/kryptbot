@@ -588,7 +588,7 @@ WarMom.prototype._handleReminder = function(roomName, reminder, status, entries,
     , warTimeMsg = ''
 
   if (reminder.filter.range) {
-    if (Object.keys(rosterPartitions).includes(entries.size)) {
+    if (Object.keys(rosterPartitions).includes(entries.size.toString())) {
       range = rosterPartitions[entries.size][reminder.filter.range]
     }
   }
