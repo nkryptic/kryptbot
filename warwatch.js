@@ -10,9 +10,9 @@ const splitMessage = require('discord.js').splitMessage
 const Storage = require('node-storage')
 const hash = require('string-hash')
 const Logger = require('./logger.js')
-const logger = new Logger('WarMom')
+const logger = new Logger('WarWatch')
 
-const base_cmd_text = '!warmom'
+const base_cmd_text = '!warwatch'
 const base_cmd_regex = new RegExp(/^/.source + base_cmd_text + /\b/.source, 'i')
 const usage_cmd_regex = new RegExp(base_cmd_regex.source + / *$/.source, 'i')
 const list_owners_cmd_regex = new RegExp(base_cmd_regex.source + / +owners *$/.source, 'i')
@@ -38,17 +38,17 @@ const status_regex = new RegExp(
 const lineup_regex = new RegExp(/^(\d+)\. TH\d+ (.+) (?:([12]) attacks left|done)$/)
 const marching_regex = new RegExp(/^(\d+)\. TH\d+ (.+): (.*)$/)
 const roster_regex = new RegExp(/^TH(\d+) (.+) \$\d+(?: k\d+)?(?: q\d+)?(?: w\d+)?$/)
-const basicUsage = '*The WarMom commands:*' + '\n'
-  + '**`!warmom status` ** - show clan reminder status' + '\n'
-  + '**`!warmom owners` ** - list Discord users with registered CoC accounts (in any clan)' + '\n'
-  + '**`!warmom roster` ** - list clan accounts with their registered owner (or warmomID)' + '\n'
-  + '**`!warmom identify <clashID or warmomID>` ** - register a clan account to yourself'
+const basicUsage = '*The WarWatch commands:*' + '\n'
+  + '**`!warwatch status` ** - show clan reminder status' + '\n'
+  + '**`!warwatch owners` ** - list Discord users with registered CoC accounts (in any clan)' + '\n'
+  + '**`!warwatch roster` ** - list clan accounts with their registered owner (or WarWatchID)' + '\n'
+  + '**`!warwatch identify <clashID or WarWatchID>` ** - register a clan account to yourself'
 const authUsage = basicUsage + '\n\nAdmin-only commands:\n'
-  + '**`!warmom add <clashID or warmomID> to <Discord username>` ** - register a clan account for a Discord user' + '\n'
-  + '**`!warmom remove <clashID or warmomID>` ** - unregister a clan account' + '\n'
-  + '**`!warmom cleanup` ** - remove Discord users and registered accounts that have left the server' + '\n'
-  + '**`!warmom notify march` ** - ping marching orders to owners of clan accounts in war'
-const badChannel = 'WarMom can only be run from a war room channel'
+  + '**`!warwatch add <clashID or WarWatchID> to <Discord username>` ** - register a clan account for a Discord user' + '\n'
+  + '**`!warwatch remove <clashID or WarWatchID>` ** - unregister a clan account' + '\n'
+  + '**`!warwatch cleanup` ** - remove Discord users and registered accounts that have left the server' + '\n'
+  + '**`!warwatch notify march` ** - ping marching orders to owners of clan accounts in war'
+const badChannel = 'WarWatch can only be run from a war room channel'
 const warmatchErrorMsg = 'There was an error retrieving information from warmatch'
 const msDay = 24 * 60 * 60 * 1000
     , msHour = 60 * 60 * 1000
@@ -119,11 +119,11 @@ const retryInfo = {
 }
 
 
-function WarMom(config, client) {
+function WarWatch(config, client) {
   // this.annChannel = null
   this.client = client
-  // this.options = Object.assign({}, config.warmom)
-  this.options = JSON.parse(JSON.stringify(config.warmom))
+  // this.options = Object.assign({}, config.warwatch)
+  this.options = JSON.parse(JSON.stringify(config.warwatch))
   this.db = new Storage(this.options.db)
   this.accounts = {
       clash: new Map(this.db.get('accounts.clash') || [])
@@ -142,18 +142,18 @@ function WarMom(config, client) {
   }
 }
 
-WarMom.prototype._timeToMS = function(time) {
+WarWatch.prototype._timeToMS = function(time) {
   const total = (msHour * (time.hours || 0)) + (msMinute * (time.minutes || 0))
   return total
 }
 
-WarMom.prototype._formatMS = function(total) {
+WarWatch.prototype._formatMS = function(total) {
   const hours = Math.floor(total / msHour)
       , minutes = Math.floor((total % msHour) / msMinute)
   return this._formatTime(minutes, hours)
 }
 
-WarMom.prototype._formatTime = function(minutes, hours) {
+WarWatch.prototype._formatTime = function(minutes, hours) {
   let message
     , part
     , parts = []
@@ -181,7 +181,7 @@ WarMom.prototype._formatTime = function(minutes, hours) {
   return message
 }
 
-WarMom.prototype._formatMemberMsg = function(member, text, testing) {
+WarWatch.prototype._formatMemberMsg = function(member, text, testing) {
   let output
 
   if (testing) {
@@ -199,7 +199,7 @@ WarMom.prototype._formatMemberMsg = function(member, text, testing) {
   return output
 }
 
-WarMom.prototype._sendMessage = function(channel, output) {
+WarWatch.prototype._sendMessage = function(channel, output) {
   let messages = splitMessage(output)
   if (messages instanceof Array) {
     for (let partial of messages) {
@@ -213,7 +213,7 @@ WarMom.prototype._sendMessage = function(channel, output) {
   }
 }
 
-WarMom.prototype._getMember = function(needle, searchByName) {
+WarWatch.prototype._getMember = function(needle, searchByName) {
   let target = null
 
   if (needle) {
@@ -234,7 +234,7 @@ WarMom.prototype._getMember = function(needle, searchByName) {
   return target
 }
 
-WarMom.prototype._addAccount = function(clashid, member) {
+WarWatch.prototype._addAccount = function(clashid, member) {
   for (let [k, v] of this.accounts.discord.entries()) {
     if (k != member.id && v.indexOf(clashid) > -1) {
       v.splice(v.indexOf(clashid), 1)
@@ -257,7 +257,7 @@ WarMom.prototype._addAccount = function(clashid, member) {
   this.db.put('accounts.clash', Array.from(this.accounts.clash.entries()))
 }
 
-WarMom.prototype._removeAccount = function(clashid) {
+WarWatch.prototype._removeAccount = function(clashid) {
   for (let [k, v] of this.accounts.discord.entries()) {
     if (v.indexOf(clashid) > -1) {
       v.splice(v.indexOf(clashid), 1)
@@ -276,7 +276,7 @@ WarMom.prototype._removeAccount = function(clashid) {
   this.db.put('accounts.clash', Array.from(this.accounts.clash.entries()))
 }
 
-WarMom.prototype._lookupClashID = function(clashid_or_hash) {
+WarWatch.prototype._lookupClashID = function(clashid_or_hash) {
   let clashid
 
   for (let k of this.accounts.clash.keys()) {
@@ -288,7 +288,7 @@ WarMom.prototype._lookupClashID = function(clashid_or_hash) {
   return clashid
 }
 
-WarMom.prototype._addReminder = function(roomName, idx, sourceReminder) {
+WarWatch.prototype._addReminder = function(roomName, idx, sourceReminder) {
   let reminder = JSON.parse(JSON.stringify(sourceReminder))
 
   if (! (reminder.include && reminder.include instanceof Object)) {
@@ -319,19 +319,19 @@ WarMom.prototype._addReminder = function(roomName, idx, sourceReminder) {
   this.reminders[roomName].push(reminder)
 }
 
-WarMom.prototype._clearTimer = function(roomName) {
+WarWatch.prototype._clearTimer = function(roomName) {
   for (let t of this.timers[roomName]) {
     clearTimeout(t)
   }
   this.timers[roomName] = []
 }
 
-WarMom.prototype._addTimer = function(roomName, func, interval) {
+WarWatch.prototype._addTimer = function(roomName, func, interval) {
   // save the timeout ID, so we can cancel
   this.timers[roomName].push(setTimeout(func, interval))
 }
 
-WarMom.prototype._validateAutoSettings = function() {
+WarWatch.prototype._validateAutoSettings = function() {
   const defaultTime = {hours: 1, minutes: 0}
   let override = false
   for (let roomName of Object.keys(this.options.warrooms)) {
@@ -355,7 +355,7 @@ WarMom.prototype._validateAutoSettings = function() {
   }
 }
 
-WarMom.prototype.resolveClashID = function(clashid_or_hash, roomName) {
+WarWatch.prototype.resolveClashID = function(clashid_or_hash, roomName) {
   return this.getRoster(roomName)
     .then(function(roster) {
       let clashid = null
@@ -368,7 +368,7 @@ WarMom.prototype.resolveClashID = function(clashid_or_hash, roomName) {
     }.bind(this))
 }
 
-WarMom.prototype.parseStatus = function(message) {
+WarWatch.prototype.parseStatus = function(message) {
   const match = status_regex.exec(message)
   const status = {
       status: match && match[1]
@@ -383,7 +383,7 @@ WarMom.prototype.parseStatus = function(message) {
   return status
 }
 
-WarMom.prototype.parseLineup = function(message) {
+WarWatch.prototype.parseLineup = function(message) {
   // parse out the CoC account names and attacks
   let lineup = new Map()
 
@@ -403,7 +403,7 @@ WarMom.prototype.parseLineup = function(message) {
   return lineup
 }
 
-WarMom.prototype.parseMarchingOrders = function(message) {
+WarWatch.prototype.parseMarchingOrders = function(message) {
   // parse out the CoC account names and orders
   let orders = new Map()
 
@@ -423,7 +423,7 @@ WarMom.prototype.parseMarchingOrders = function(message) {
   return orders
 }
 
-WarMom.prototype.parseRoster = function(message) {
+WarWatch.prototype.parseRoster = function(message) {
   // parse out the CoC account names
   let roster = []
 
@@ -442,7 +442,7 @@ WarMom.prototype.parseRoster = function(message) {
   return roster
 }
 
-WarMom.prototype.getLineup = function(roomName) {
+WarWatch.prototype.getLineup = function(roomName) {
   const filter = m => m.author.bot && m.content.startsWith('Our lineup')
   // errors: ['time'] treats ending because of the time limit as an error
   let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
@@ -473,7 +473,7 @@ WarMom.prototype.getLineup = function(roomName) {
   return promise
 }
 
-WarMom.prototype.getMarchingOrders = function(roomName) {
+WarWatch.prototype.getMarchingOrders = function(roomName) {
   const filter = m => m.author.bot && m.content.startsWith('Marching orders')
   // errors: ['time'] treats ending because of the time limit as an error
   let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
@@ -504,7 +504,7 @@ WarMom.prototype.getMarchingOrders = function(roomName) {
   return promise
 }
 
-WarMom.prototype.getStatus = function(roomName) {
+WarWatch.prototype.getStatus = function(roomName) {
   // get the current war status from '.status'
   const filter = m => m.author.bot && m.author.username === 'wmbot' && status_regex.test(m.content)
 
@@ -536,7 +536,7 @@ WarMom.prototype.getStatus = function(roomName) {
   return promise
 }
 
-WarMom.prototype.getRoster = function(roomName) {
+WarWatch.prototype.getRoster = function(roomName) {
   // get the current roster from '.list weight'
   const filter = m => m.author.bot && m.author.username === 'wmbot' && m.content.startsWith('List all by weight')
 
@@ -568,7 +568,7 @@ WarMom.prototype.getRoster = function(roomName) {
   return promise
 }
 
-WarMom.prototype._mergeLineupOrders = function(lineup, orders) {
+WarWatch.prototype._mergeLineupOrders = function(lineup, orders) {
   let results = new Map()
   for (let [idx, entry] of lineup) {
     let order = orders.get(idx) || {}
@@ -579,7 +579,7 @@ WarMom.prototype._mergeLineupOrders = function(lineup, orders) {
   return results
 }
 
-WarMom.prototype._handleReminder = function(roomName, reminder, status, entries, channel, testing) {
+WarWatch.prototype._handleReminder = function(roomName, reminder, status, entries, channel, testing) {
   let unnotified = []
     , owned = new Map([])
     // , baseMsg
@@ -661,7 +661,7 @@ WarMom.prototype._handleReminder = function(roomName, reminder, status, entries,
   }
 }
 
-WarMom.prototype.doReminder = function(roomName, reminderIdx, channel, testing, retries) {
+WarWatch.prototype.doReminder = function(roomName, reminderIdx, channel, testing, retries) {
   let reminder
   if (reminderIdx instanceof Object) {
     reminder = reminderIdx
@@ -719,7 +719,7 @@ WarMom.prototype.doReminder = function(roomName, reminderIdx, channel, testing, 
   }
 }
 
-WarMom.prototype.notifyMarchingOrders = function(roomName, channel, testing) {
+WarWatch.prototype.notifyMarchingOrders = function(roomName, channel, testing) {
   let reminder = {
       label: "Ping with initial marching orders"
     , filter: {}
@@ -730,7 +730,7 @@ WarMom.prototype.notifyMarchingOrders = function(roomName, channel, testing) {
   this.doReminder(roomName, reminder, channel, testing)
 }
 
-WarMom.prototype.checkWar = function(roomName, justActivated, channel) {
+WarWatch.prototype.checkWar = function(roomName, justActivated, channel) {
   if (! (this.options.warrooms[roomName].autoRemind || this.options.warrooms[roomName].autoMarch)) {
     return
   }
@@ -794,7 +794,7 @@ WarMom.prototype.checkWar = function(roomName, justActivated, channel) {
     })
 }
 
-WarMom.prototype.listClanRoster = function(roomName, channel) {
+WarWatch.prototype.listClanRoster = function(roomName, channel) {
   this.getRoster(roomName)
     .then(function(roster) {
       let clan = this.options.warrooms[roomName].clan
@@ -820,10 +820,10 @@ WarMom.prototype.listClanRoster = function(roomName, channel) {
               memberText = memberText + ' :warning:'
               missingRoleExists = true
             }
-            owned.push(`${entry.clashid} [warmomID: ${entry.uid}] - owned by ${memberText}`)
+            owned.push(`${entry.clashid} [WarWatchID: ${entry.uid}] - owned by ${memberText}`)
           }
           else {
-            unowned.push(`${entry.clashid} [warmomID: ${entry.uid}]`)
+            unowned.push(`${entry.clashid} [WarWatchID: ${entry.uid}]`)
           }
         }
         if (owned.length > 0) {
@@ -851,7 +851,7 @@ WarMom.prototype.listClanRoster = function(roomName, channel) {
     })
 }
 
-WarMom.prototype.listKnownOwners = function(channel) {
+WarWatch.prototype.listKnownOwners = function(channel) {
   // compile list of owners (nickname or username) and the CoC accounts they own
   let output = '**Known Owners:**\n'
     , owners = []
@@ -874,7 +874,7 @@ WarMom.prototype.listKnownOwners = function(channel) {
   this._sendMessage(channel, output)
 }
 
-WarMom.prototype.addAccount = function(roomName, channel, message) {
+WarWatch.prototype.addAccount = function(roomName, channel, message) {
   let username = null
     , clashid = null
     , clashid_or_hash = null
@@ -896,8 +896,8 @@ WarMom.prototype.addAccount = function(roomName, channel, message) {
           }
           else {
             channel.sendMessage(
-                `**Oops...** A CoC account with name or warmomID matching ${clashid_or_hash} was not found on the roster` + '\n'
-                + 'find the correct warmomID or name by running the `' + base_cmd_text + ' roster` command'
+                `**Oops...** A CoC account with name or WarWatchID matching ${clashid_or_hash} was not found on the roster` + '\n'
+                + 'find the correct WarWatchID or name by running the `' + base_cmd_text + ' roster` command'
               )
               .catch(logger.error.bind(logger))
           }
@@ -914,7 +914,7 @@ WarMom.prototype.addAccount = function(roomName, channel, message) {
   }
 }
 
-WarMom.prototype.removeAccount = function(channel, message) {
+WarWatch.prototype.removeAccount = function(channel, message) {
   let clashid = null
     , clashid_or_hash = null
     , match = remove_cmd_regex.exec(message)
@@ -930,15 +930,15 @@ WarMom.prototype.removeAccount = function(channel, message) {
     }
     else {
       channel.sendMessage(
-          `**Oops...** A CoC account with name or warmomID matching ${clashid_or_hash} was not registered` + '\n'
-          + 'find the correct warmomID or name by running the `' + base_cmd_text + ' roster` command'
+          `**Oops...** A CoC account with name or WarWatchID matching ${clashid_or_hash} was not registered` + '\n'
+          + 'find the correct WarWatchID or name by running the `' + base_cmd_text + ' roster` command'
         )
         .catch(logger.error.bind(logger))
     }
   }
 }
 
-WarMom.prototype.cleanupOwners = function(channel) {
+WarWatch.prototype.cleanupOwners = function(channel) {
   let clashids = []
     , counter = 0
   for (let [k, v] of this.accounts.discord.entries()) {
@@ -959,7 +959,7 @@ WarMom.prototype.cleanupOwners = function(channel) {
     .catch(logger.error.bind(logger))
 }
 
-WarMom.prototype.identifyAccount = function(roomName, channel, message, member) {
+WarWatch.prototype.identifyAccount = function(roomName, channel, message, member) {
   let clashid = null
     , clashid_or_hash = null
     , match = identify_cmd_regex.exec(message)
@@ -982,8 +982,8 @@ WarMom.prototype.identifyAccount = function(roomName, channel, message, member) 
         }
         else {
           channel.sendMessage(
-              `**Oops...** A CoC account with name or warmomID matching ${clashid_or_hash} was not found on the roster` + '\n'
-              + 'find the correct warmomID or name by running the `' + base_cmd_text + ' roster` command'
+              `**Oops...** A CoC account with name or WarWatchID matching ${clashid_or_hash} was not found on the roster` + '\n'
+              + 'find the correct WarWatchID or name by running the `' + base_cmd_text + ' roster` command'
             )
             .catch(logger.error.bind(logger))
         }
@@ -995,7 +995,7 @@ WarMom.prototype.identifyAccount = function(roomName, channel, message, member) 
   }
 }
 
-WarMom.prototype.releaseAccount = function(roomName, channel, message, member) {
+WarWatch.prototype.releaseAccount = function(roomName, channel, message, member) {
   let clashid = null
     , clashid_or_hash = null
     , match = release_cmd_regex.exec(message)
@@ -1018,14 +1018,14 @@ WarMom.prototype.releaseAccount = function(roomName, channel, message, member) {
     }
     else {
       channel.sendMessage(
-          `**Oops...** A CoC account with name or warmomID matching ${clashid_or_hash} was not registered` + '\n'
-          + 'find the correct warmomID or name by running the `' + base_cmd_text + ' roster` command')
+          `**Oops...** A CoC account with name or WarWatchID matching ${clashid_or_hash} was not registered` + '\n'
+          + 'find the correct WarWatchID or name by running the `' + base_cmd_text + ' roster` command')
         .catch(logger.error.bind(logger))
     }
   }
 }
 
-WarMom.prototype.reportStatus = function(roomName, channel) {
+WarWatch.prototype.reportStatus = function(roomName, channel) {
   // are reminders enabled for warroom?
   // are we currently in war
   // what reminders will be setup
@@ -1042,7 +1042,7 @@ WarMom.prototype.reportStatus = function(roomName, channel) {
   if (this.options.warrooms[roomName].autoMarch) {
     autoMarchStatus = 'enabled'
   }
-  output = `${clan} warmom status`
+  output = `${clan} warwatch status`
   output = output + '\n\n' + `auto notification of marching orders: **${autoMarchStatus}**`
   output = output + '\n' + `- marching orders would be sent ${autoMarchTime} before war starts`
   output = output + '\n\n' + `war attack reminders: **${autoRemindStatus}**`
@@ -1063,7 +1063,7 @@ WarMom.prototype.reportStatus = function(roomName, channel) {
     .catch(logger.error.bind(logger))
 }
 
-WarMom.prototype.onMessage = function(msg) {
+WarWatch.prototype.onMessage = function(msg) {
   const roomName = msg.channel.name
       , authzRoleName = this.options.authzRole
       , isWarRoom = Object.keys(this.warrooms).includes(roomName)
@@ -1217,7 +1217,7 @@ WarMom.prototype.onMessage = function(msg) {
   }
 }
 
-WarMom.prototype.onReady = function() {
+WarWatch.prototype.onReady = function() {
   if (!this.online) {
     logger.log('online!')
     this.online = true
@@ -1238,4 +1238,4 @@ WarMom.prototype.onReady = function() {
 }
 
 
-module.exports = WarMom
+module.exports = WarWatch

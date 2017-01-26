@@ -5,9 +5,9 @@
         "db": "./forecast.db",
         "channel": "loot-forecast"
     },
-    "warmom": {
+    "warwatch": {
         "enabled": true,
-        "db": "./warmom.db",
+        "db": "./warwatch.db",
         "guild": "Playmakers Wanted",
         "authzRole": "Co-Leaders",
         "warrooms": {

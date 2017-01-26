@@ -9,12 +9,12 @@ To add to server with administrator permission:
 https://discordapp.com/oauth2/authorize?client_id=APPLICATION_CLIENT_ID&permissions=8&scope=bot 
 */
 
-const config = require('./config.json')
-const Discord = require('discord.js');
+const config   = require('./config.json')
+const Discord  = require('discord.js');
 const Forecast = require('./forecast.js')
-const WarMom = require('./warmom.js')
+const WarWatch = require('./warwatch.js')
 const Playtime = require('./playtime.js')
-const Logger = require('./logger.js')
+const Logger   = require('./logger.js')
 
 const logger = new Logger('kryptBot')
 logger.log('starting initial setup')
@@ -24,7 +24,7 @@ bot.on('ready', () => { logger.log('ready!') })
 bot.on('reconnecting', () => { logger.error('reconnecting to discord') })
 
 var forecast = new Forecast(config, bot)
-var warmom   = new WarMom(config, bot)
+var warwatch = new WarWatch(config, bot)
 var playtime = new Playtime(config, bot)
 
 bot.login(config.botToken)
