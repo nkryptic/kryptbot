@@ -10,8 +10,11 @@ const splitMessage = require('discord.js').splitMessage
 const Storage = require('node-storage')
 const hash = require('string-hash')
 const Logger = require('./logger.js')
-const logger = new Logger('WarWatch')
 
+const appName = 'WarWatch'
+const logger = new Logger(appName)
+
+const acctHashLabel = appName + 'ID'
 const base_cmd_text = '!warwatch'
 const base_cmd_regex = new RegExp(/^/.source + base_cmd_text + /\b/.source, 'i')
 const usage_cmd_regex = new RegExp(base_cmd_regex.source + / *$/.source, 'i')
@@ -38,17 +41,17 @@ const status_regex = new RegExp(
 const lineup_regex = new RegExp(/^(\d+)\. TH\d+ (.+) (?:([12]) attacks left|done)$/)
 const marching_regex = new RegExp(/^(\d+)\. TH\d+ (.+): (.*)$/)
 const roster_regex = new RegExp(/^TH(\d+) (.+) \$\d+(?: k\d+)?(?: q\d+)?(?: w\d+)?$/)
-const basicUsage = '*The WarWatch commands:*' + '\n'
-  + '**`!warwatch status` ** - show clan reminder status' + '\n'
-  + '**`!warwatch owners` ** - list Discord users with registered CoC accounts (in any clan)' + '\n'
-  + '**`!warwatch roster` ** - list clan accounts with their registered owner (or WarWatchID)' + '\n'
-  + '**`!warwatch identify <clashID or WarWatchID>` ** - register a clan account to yourself'
+const basicUsage = '*The ' + appName + ' commands:*' + '\n'
+  + '**`' + base_cmd_text + ' status` ** - show clan reminder status' + '\n'
+  + '**`' + base_cmd_text + ' owners` ** - list Discord users with registered CoC accounts (in any clan)' + '\n'
+  + '**`' + base_cmd_text + ' roster` ** - list clan accounts with their registered owner (or ' + acctHashLabel + ')' + '\n'
+  + '**`' + base_cmd_text + ' identify <clashID or ' + acctHashLabel + '>` ** - register a clan account to yourself'
 const authUsage = basicUsage + '\n\nAdmin-only commands:\n'
-  + '**`!warwatch add <clashID or WarWatchID> to <Discord username>` ** - register a clan account for a Discord user' + '\n'
-  + '**`!warwatch remove <clashID or WarWatchID>` ** - unregister a clan account' + '\n'
-  + '**`!warwatch cleanup` ** - remove Discord users and registered accounts that have left the server' + '\n'
-  + '**`!warwatch notify march` ** - ping marching orders to owners of clan accounts in war'
-const badChannel = 'WarWatch can only be run from a war room channel'
+  + '**`' + base_cmd_text + ' add <clashID or ' + acctHashLabel + '> to <Discord username>` ** - register a clan account for a Discord user' + '\n'
+  + '**`' + base_cmd_text + ' remove <clashID or ' + acctHashLabel + '>` ** - unregister a clan account' + '\n'
+  + '**`' + base_cmd_text + ' cleanup` ** - remove Discord users and registered accounts that have left the server' + '\n'
+  + '**`' + base_cmd_text + ' notify march` ** - ping marching orders to owners of clan accounts in war'
+const badChannel = appName + ' can only be run from a war room channel'
 const warmatchErrorMsg = 'There was an error retrieving information from warmatch'
 const msDay = 24 * 60 * 60 * 1000
     , msHour = 60 * 60 * 1000
@@ -820,10 +823,10 @@ WarWatch.prototype.listClanRoster = function(roomName, channel) {
               memberText = memberText + ' :warning:'
               missingRoleExists = true
             }
-            owned.push(`${entry.clashid} [WarWatchID: ${entry.uid}] - owned by ${memberText}`)
+            owned.push(`${entry.clashid} [${acctHashLabel}: ${entry.uid}] - owned by ${memberText}`)
           }
           else {
-            unowned.push(`${entry.clashid} [WarWatchID: ${entry.uid}]`)
+            unowned.push(`${entry.clashid} [${acctHashLabel}: ${entry.uid}]`)
           }
         }
         if (owned.length > 0) {
@@ -896,8 +899,8 @@ WarWatch.prototype.addAccount = function(roomName, channel, message) {
           }
           else {
             channel.sendMessage(
-                `**Oops...** A CoC account with name or WarWatchID matching ${clashid_or_hash} was not found on the roster` + '\n'
-                + 'find the correct WarWatchID or name by running the `' + base_cmd_text + ' roster` command'
+                `**Oops...** A CoC account with name or ${acctHashLabel} matching ${clashid_or_hash} was not found on the roster` + '\n'
+                + 'find the correct ' + acctHashLabel + ' or name by running the `' + base_cmd_text + ' roster` command'
               )
               .catch(logger.error.bind(logger))
           }
@@ -930,8 +933,8 @@ WarWatch.prototype.removeAccount = function(channel, message) {
     }
     else {
       channel.sendMessage(
-          `**Oops...** A CoC account with name or WarWatchID matching ${clashid_or_hash} was not registered` + '\n'
-          + 'find the correct WarWatchID or name by running the `' + base_cmd_text + ' roster` command'
+          `**Oops...** A CoC account with name or ${acctHashLabel} matching ${clashid_or_hash} was not registered` + '\n'
+          + 'find the correct ' + acctHashLabel + ' or name by running the `' + base_cmd_text + ' roster` command'
         )
         .catch(logger.error.bind(logger))
     }
@@ -982,8 +985,8 @@ WarWatch.prototype.identifyAccount = function(roomName, channel, message, member
         }
         else {
           channel.sendMessage(
-              `**Oops...** A CoC account with name or WarWatchID matching ${clashid_or_hash} was not found on the roster` + '\n'
-              + 'find the correct WarWatchID or name by running the `' + base_cmd_text + ' roster` command'
+              `**Oops...** A CoC account with name or ${acctHashLabel} matching ${clashid_or_hash} was not found on the roster` + '\n'
+              + 'find the correct ' + acctHashLabel + ' or name by running the `' + base_cmd_text + ' roster` command'
             )
             .catch(logger.error.bind(logger))
         }
@@ -1018,8 +1021,8 @@ WarWatch.prototype.releaseAccount = function(roomName, channel, message, member)
     }
     else {
       channel.sendMessage(
-          `**Oops...** A CoC account with name or WarWatchID matching ${clashid_or_hash} was not registered` + '\n'
-          + 'find the correct WarWatchID or name by running the `' + base_cmd_text + ' roster` command')
+          `**Oops...** A CoC account with name or ${acctHashLabel} matching ${clashid_or_hash} was not registered` + '\n'
+          + 'find the correct ' + acctHashLabel + ' or name by running the `' + base_cmd_text + ' roster` command')
         .catch(logger.error.bind(logger))
     }
   }
