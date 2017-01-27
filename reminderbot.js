@@ -11,7 +11,7 @@ var bot = new Discord.Client();
 bot.on('ready', () => {
   const gngChan = bot.channels.find('name', 'gng-warroom')
   const gngRole = gngChan.guild.roles.find('name', 'GNG')
-  gngChan.sendMessage('**Reminder** collect your treasury loot before war ends! ' + gngRole)
+  // gngChan.sendMessage('**Reminder** collect your treasury loot before war ends! ' + gngRole)
   bot.destroy()
 })
 bot.login(config.botToken)
