@@ -616,7 +616,7 @@ WarWatch.prototype._handleReminder = function(roomName, reminder, status, entrie
   }
 
   if (reminder.include.timeLeft) {
-    warTimeMsg = 'war ends in ' + this._formatTime(status.minutes, status.hours)
+    warTimeMsg = `war ${status.status} in ` + this._formatTime(status.minutes, status.hours)
   }
 
   for (let [idx, entry] of entries) {
@@ -625,6 +625,9 @@ WarWatch.prototype._handleReminder = function(roomName, reminder, status, entrie
       skip = true
     }
     if ((range.min && entry.position < range.min) || (range.max && entry.position > range.max)) {
+      skip = true
+    }
+    if (status.status == 'starts' && reminder.include.orders && !entry.orders) {
       skip = true
     }
 
@@ -694,7 +697,7 @@ WarWatch.prototype.doReminder = function(roomName, reminderIdx, channel, testing
   if (reminder) {
     this.getStatus(roomName)
       .then(function(status) {
-        if (status.status === 'ends' || (status.status == 'starts' && reminder.include.orders && (!reminder.include.timeLeft))) {
+        if (status.status === 'ends' || (status.status == 'starts' && reminder.include.orders)) {
           this.getLineup(roomName)
             .then(function(lineup) {
               if (reminder.include.orders) {
@@ -744,6 +747,7 @@ WarWatch.prototype.notifyMarchingOrders = function(roomName, channel, testing) {
     , filter: {}
     , include: {
         orders: true
+      , timeLeft: true
       }
   }
   this.doReminder(roomName, reminder, channel, testing)
