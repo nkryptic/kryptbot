@@ -57,6 +57,22 @@ const msDay = 24 * 60 * 60 * 1000
     , msHour = 60 * 60 * 1000
     , msMinute = 60 * 1000
 const rosterPartitions = {
+  5: {
+    firstHalf: {min: 1, max: 2},
+    secondHalf: {min: 3, max: 5},
+    firstQuarter: {min: 1, max: 1},
+    secondQuarter: {min: 2, max: 2},
+    thirdQuarter: {min: 3, max: 3},
+    fourthQuarter: {min: 4, max: 5}
+  },
+  10: {
+    firstHalf: {min: 1, max: 5},
+    secondHalf: {min: 6, max: 10},
+    firstQuarter: {min: 1, max: 2},
+    secondQuarter: {min: 3, max: 5},
+    thirdQuarter: {min: 6, max: 7},
+    fourthQuarter: {min: 8, max: 10}
+  },
   15: {
     firstHalf: {min: 1, max: 7},
     secondHalf: {min: 8, max: 15},
