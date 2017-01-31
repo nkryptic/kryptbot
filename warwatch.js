@@ -604,8 +604,8 @@ WarWatch.prototype._handleReminder = function(roomName, reminder, status, entrie
     // , baseMsg
     , minAttacks = 1
     , range = {}
-    , warTimeMsg = ''
     , clan = this.options.warrooms[roomName].clan
+    , warTimeMsg = `${clan} war...`
 
   if (reminder.filter.range) {
     if (Object.keys(rosterPartitions).includes(entries.size.toString())) {
