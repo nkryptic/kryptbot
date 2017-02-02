@@ -130,6 +130,14 @@ const VALID_RANGE_KEYS = new Set([
   , 'thirdQuarter'
   , 'fourthQuarter'
 ])
+const HUMANIZED_RANGES = new Map([
+    ['firstHalf', 'top 50%']
+  , ['secondHalf', 'bottom 50%']
+  , ['firstQuarter', 'top 25%']
+  , ['secondQuarter', 'upper-middle 25%']
+  , ['thirdQuarter', 'lower-middle 25%']
+  , ['fourthQuarter', 'bottom 25%']
+])
 const retryInfo = {
     checkWarNoWarInterval: 12 * msHour
   , checkWarErrorInterval: 30 * msMinute
@@ -159,6 +167,11 @@ function WarWatch(config, client) {
     this.client.on('message', this.onMessage.bind(this))
     this.client.on('ready', this.onReady.bind(this))
   }
+}
+
+WarWatch.prototype._humanizeRange = function(range) {
+  const output = HUMANIZED_RANGES.get(range) || 'unknown %'
+  return output
 }
 
 WarWatch.prototype._timeToMS = function(time) {
@@ -742,7 +755,7 @@ WarWatch.prototype.doReminder = function(roomName, reminderIdx, channel, testing
   }
 }
 
-WarWatch.prototype.notifyMarchingOrders = function(roomName, channel, testing) {
+WarWatch.prototype.notifyMarchingOrders = function(roomName, range, channel, testing) {
   let reminder = {
       label: "Ping with initial marching orders"
     , filter: {}
@@ -750,6 +763,10 @@ WarWatch.prototype.notifyMarchingOrders = function(roomName, channel, testing) {
         orders: true
       , timeLeft: true
       }
+  }
+  if (range) {
+    reminder.filter.range = range
+    reminder.label = 'Ping ' + this._humanizeRange(range) + ' with initial marching orders'
   }
   this.doReminder(roomName, reminder, channel, testing)
 }
@@ -785,7 +802,7 @@ WarWatch.prototype.checkWar = function(roomName, justActivated, channel) {
                 .catch(logger.error.bind(logger))
             }
             this._addTimer(roomName, function() {
-              this.notifyMarchingOrders(roomName)
+              this.notifyMarchingOrders(roomName, this.options.warrooms[roomName].autoMarchTime.range)
             }.bind(this), interval)
           }
         }
@@ -1069,6 +1086,9 @@ WarWatch.prototype.reportStatus = function(roomName, channel) {
   output = `${clan} warwatch status`
   output = output + '\n\n' + `auto notification of marching orders: **${autoMarchStatus}**`
   output = output + '\n' + `- marching orders would be sent ${autoMarchTime} before war starts`
+  if (this.options.warrooms[roomName].autoMarchTime.range) {
+    output = output + 'to the ' + this._humanizeRange(this.options.warrooms[roomName].autoMarchTime.range) + ' of the roster'
+  }
   output = output + '\n\n' + `war attack reminders: **${autoRemindStatus}**`
   if (this.reminders[roomName].length) {
     output = output + '\nregistered reminders:'
@@ -1156,7 +1176,7 @@ WarWatch.prototype.onMessage = function(msg) {
     }
     else if (marching_orders_cmd_regex.test(msg.content)) {
       if (isAdminUser(msg)) {
-        this.notifyMarchingOrders(roomName, msg.channel)
+        this.notifyMarchingOrders(roomName, undefined, msg.channel)
       }
       else {
         unauthorized = true
@@ -1180,7 +1200,7 @@ WarWatch.prototype.onMessage = function(msg) {
           this.listClanRoster(roomName, msg.channel)
         }
         else if (cmd === 'march') {
-          this.notifyMarchingOrders(roomName, msg.channel, true)
+          this.notifyMarchingOrders(roomName, undefined, msg.channel, true)
         }
         else if (cmd === 'war') {
           this.checkWar(roomName)

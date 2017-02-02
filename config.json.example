@@ -15,7 +15,8 @@
                 "autoRemind": true,
                 "autoMarch": true,
                 "autoMarchTime": {
-                    "hours": 2
+                    "minutes": 15,
+                    "range": "secondHalf",
                 },
                 "clan": "Grit N Grind",
                 "clanRole": "GNG",
