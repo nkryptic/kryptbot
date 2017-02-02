@@ -1087,7 +1087,7 @@ WarWatch.prototype.reportStatus = function(roomName, channel) {
   output = output + '\n\n' + `auto notification of marching orders: **${autoMarchStatus}**`
   output = output + '\n' + `- marching orders would be sent ${autoMarchTime} before war starts`
   if (this.options.warrooms[roomName].autoMarchTime.range) {
-    output = output + 'to the ' + this._humanizeRange(this.options.warrooms[roomName].autoMarchTime.range) + ' of the roster'
+    output = output + ' to the ' + this._humanizeRange(this.options.warrooms[roomName].autoMarchTime.range) + ' of the roster'
   }
   output = output + '\n\n' + `war attack reminders: **${autoRemindStatus}**`
   if (this.reminders[roomName].length) {
