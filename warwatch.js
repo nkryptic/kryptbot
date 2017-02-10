@@ -733,7 +733,7 @@ WarWatch.prototype.doReminder = function(roomName, reminderIdx, channel, testing
       .catch(e => {
         let retry_count = retries || 0
         logger.error('Failed executing reminder... issue with status or lineup from warmatch')
-        if ((! testing) && (retry_count < reminderErrorMaxTries)) {
+        if ((! testing) && (retry_count < retryInfo.reminderErrorMaxTries)) {
           logger.error('retrying reminder...')
           // couldn't get status from warmatch, so retry later
           this._addTimer(roomName, function() {
