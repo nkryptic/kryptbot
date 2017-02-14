@@ -673,7 +673,7 @@ WarWatch.prototype.doReminder = function(roomName, reminderIdx, channel, testing
             }.bind(this), retryInfo.reminderErrorInterval)
           }
           else {
-            channel.sendMessage(`Failed to send reminder *${reminder.label}*` + warmatchErrorMsg)
+            channel.sendMessage(`Failed to send reminder *${reminder.label}* ` + warmatchErrorMsg)
               .catch(e => {})
           }
         }
