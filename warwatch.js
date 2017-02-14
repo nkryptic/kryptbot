@@ -718,7 +718,7 @@ WarWatch.prototype.checkWar = function(roomName, justActivated, channel) {
       // - if war ends... then we setup timers for reminders
       if (status.status === 'starts') {
         // setup timer to check status when war starts
-        let interval = status.totalMilliseconds + 1000
+        let interval = status.totalMilliseconds + msMinute
         logger.log(roomName + ': upcoming war not started yet. rechecking to set up reminders in ' + this._formatTime(status.minutes, status.hours))
         this._addTimer(roomName, function() {
           this.checkWar(roomName)
