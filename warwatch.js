@@ -525,6 +525,9 @@ WarWatch.prototype.getRoster = function(roomName) {
 }
 
 WarWatch.prototype._mergeLineupOrders = function(lineup, orders) {
+  if (! orders) {
+    return lineup
+  }
   let results = new Map()
   for (let [idx, entry] of lineup) {
     let order = orders.get(idx) || {}
@@ -622,6 +625,7 @@ WarWatch.prototype._handleReminder = function(roomName, reminder, status, entrie
 }
 
 WarWatch.prototype.doReminder = function(roomName, reminderIdx, channel, testing, retries) {
+  var $scope = {}
   let reminder
   if (reminderIdx instanceof Object) {
     reminder = reminderIdx
@@ -635,38 +639,43 @@ WarWatch.prototype.doReminder = function(roomName, reminderIdx, channel, testing
   if (reminder) {
     this.getStatus(roomName)
       .then(function(status) {
+        $scope.status = status
         if (status.status === 'ends' || (status.status == 'starts' && reminder.include.orders)) {
-          this.getLineup(roomName)
-            .then(function(lineup) {
-              if (reminder.include.orders) {
-                this.getMarchingOrders(roomName)
-                  .then(function(orders){
-                    let entries = this._mergeLineupOrders(lineup, orders)
-                    this._handleReminder(roomName, reminder, status, entries, channel, testing)
-                  }.bind(this))
-              }
-              else {
-                this._handleReminder(roomName, reminder, status, lineup, channel, testing)
-              }
-            }.bind(this))
+          return this.getLineup(roomName)
         }
         else {
           logger.error(`Reminder ${reminder.label} called at wrong time for ${roomName}`)
+          throw new Error('ReminderAtWrongTime')
         }
       }.bind(this))
-      .catch(e => {
-        let retry_count = retries || 0
-        logger.error('Failed executing reminder... issue with status or lineup from warmatch')
-        if ((! testing) && (retry_count < retryInfo.reminderErrorMaxTries)) {
-          logger.error('retrying reminder...')
-          // couldn't get status from warmatch, so retry later
-          this._addTimer(roomName, function() {
-            this.doReminder(roomName, reminderIdx, undefined, false, retry_count + 1)
-          }.bind(this), retryInfo.reminderErrorInterval)
+      .then(function(lineup) {
+        $scope.lineup = lineup
+        if (reminder.include.orders) {
+          return this.getMarchingOrders(roomName)
         }
         else {
-          channel.sendMessage(`Failed to send reminder *${reminder.label}*` + warmatchErrorMsg)
-            .catch(e => {})
+          return new Promise(resolve => {resolve()})
+        }
+      }.bind(this))
+      .then(function(orders){
+        let entries = this._mergeLineupOrders($scope.lineup, orders)
+        this._handleReminder(roomName, reminder, $scope.status, entries, channel, testing)
+      }.bind(this))
+      .catch(e => {
+        if (e.message != 'ReminderAtWrongTime') {
+          let retry_count = retries || 0
+          logger.error('Failed executing reminder... issue retrieving info from warmatch')
+          if ((! testing) && (retry_count < retryInfo.reminderErrorMaxTries)) {
+            logger.error('retrying reminder...')
+            // couldn't get status from warmatch, so retry later
+            this._addTimer(roomName, function() {
+              this.doReminder(roomName, reminderIdx, undefined, false, retry_count + 1)
+            }.bind(this), retryInfo.reminderErrorInterval)
+          }
+          else {
+            channel.sendMessage(`Failed to send reminder *${reminder.label}*` + warmatchErrorMsg)
+              .catch(e => {})
+          }
         }
       })
   }
