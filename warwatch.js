@@ -504,7 +504,7 @@ WarWatch.prototype._getWMInfo = function(roomName, cmd, filter, funcName) {
 
 WarWatch.prototype.getLineup = function(roomName) {
   const filter = m => m.author.bot && m.content.startsWith('Our lineup')
-  return this._getWMInfo(roomName, '.lineup', filter, 'parseLienup')
+  return this._getWMInfo(roomName, '.lineup', filter, 'parseLineup')
 }
 
 WarWatch.prototype.getMarchingOrders = function(roomName) {
