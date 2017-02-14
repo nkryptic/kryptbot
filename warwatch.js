@@ -236,12 +236,12 @@ WarWatch.prototype._sendMessage = function(channel, output) {
   if (messages instanceof Array) {
     for (let partial of messages) {
       channel.sendMessage(partial)
-        .catch(logger.error.bind(logger))
+        .catch(e => {})
     }
   }
   else {
     channel.sendMessage(messages)
-      .catch(logger.error.bind(logger))
+      .catch(e => {})
   }
 }
 
@@ -480,8 +480,8 @@ WarWatch.prototype.getLineup = function(roomName) {
   let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
     .then( function(collected) {
       let response = collected.first()
-      response.delete()
-        .catch(logger.error.bind(logger))
+      response.delete(250)
+        .catch(e => {})
       const lineup = this.parseLineup(response.content)
       return lineup
     }.bind(this))
@@ -497,10 +497,10 @@ WarWatch.prototype.getLineup = function(roomName) {
 
   this.warrooms[roomName].sendMessage('.lineup')
     .then(m => {
-      m.delete()
-        .catch(logger.error.bind(logger))
+      m.delete(250)
+        .catch(e => {})
     })
-    .catch(logger.error.bind(logger))
+    .catch(e => {})
 
   return promise
 }
@@ -511,8 +511,8 @@ WarWatch.prototype.getMarchingOrders = function(roomName) {
   let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
     .then( function(collected) {
       let response = collected.first()
-      response.delete()
-        .catch(logger.error.bind(logger))
+      response.delete(250)
+        .catch(e => {})
       const orders = this.parseMarchingOrders(response.content)
       return orders
     }.bind(this))
@@ -528,10 +528,10 @@ WarWatch.prototype.getMarchingOrders = function(roomName) {
 
   this.warrooms[roomName].sendMessage('.march')
     .then(m => {
-      m.delete()
-        .catch(logger.error.bind(logger))
+      m.delete(250)
+        .catch(e => {})
     })
-    .catch(logger.error.bind(logger))
+    .catch(e => {})
 
   return promise
 }
@@ -543,8 +543,8 @@ WarWatch.prototype.getStatus = function(roomName) {
   let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
     .then( function(collected) {
       let response = collected.first()
-      response.delete()
-        .catch(logger.error.bind(logger))
+      response.delete(250)
+        .catch(e => {})
       const status = this.parseStatus(response.content)
       return status
     }.bind(this))
@@ -560,10 +560,10 @@ WarWatch.prototype.getStatus = function(roomName) {
 
   this.warrooms[roomName].sendMessage('.status')
     .then(m => {
-      m.delete()
-        .catch(logger.error.bind(logger))
+      m.delete(250)
+        .catch(e => {})
     })
-    .catch(logger.error.bind(logger))
+    .catch(e => {})
 
   return promise
 }
@@ -575,8 +575,8 @@ WarWatch.prototype.getRoster = function(roomName) {
   let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
     .then( function(collected) {
       let response = collected.first()
-      response.delete()
-        .catch(logger.error.bind(logger))
+      response.delete(250)
+        .catch(e => {})
       const roster = this.parseRoster(response.content)
       return roster
     }.bind(this))
@@ -592,10 +592,10 @@ WarWatch.prototype.getRoster = function(roomName) {
 
   this.warrooms[roomName].sendMessage('.list weight')
     .then(m => {
-      m.delete()
-        .catch(logger.error.bind(logger))
+      m.delete(250)
+        .catch(e => {})
     })
-    .catch(logger.error.bind(logger))
+    .catch(e => {})
 
   return promise
 }
@@ -680,7 +680,7 @@ WarWatch.prototype._handleReminder = function(roomName, reminder, status, entrie
   }
 
   channel.sendMessage('Starting notifications for reminder *' + reminder.label + '*')
-    .catch(logger.error.bind(logger))
+    .catch(e => {})
 
   for (let data of owned.values()) {
     let messages = [warTimeMsg]
@@ -742,7 +742,7 @@ WarWatch.prototype.doReminder = function(roomName, reminderIdx, channel, testing
         }
         else {
           channel.sendMessage(`Failed to send reminder *${reminder.label}*` + warmatchErrorMsg)
-            .catch(logger.error.bind(logger))
+            .catch(e => {})
         }
       })
   }
@@ -750,7 +750,7 @@ WarWatch.prototype.doReminder = function(roomName, reminderIdx, channel, testing
     logger.error(`Reminder #${reminderIdx} does not exists for ${roomName}`)
     if (testing) {
       channel.sendMessage(`Reminder #${reminderIdx} does not exists for ${roomName}`)
-        .catch(logger.error.bind(logger))
+        .catch(e => {})
     }
   }
 }
@@ -799,7 +799,7 @@ WarWatch.prototype.checkWar = function(roomName, justActivated, channel) {
             logger.log(roomName + ': auto notification of marching orders in ' + this._formatMS(interval))
             if (channel && justActivated) {
               channel.sendMessage('Marching orders will be sent to roster in ' + this._formatMS(interval))
-                .catch(logger.error.bind(logger))
+                .catch(e => {})
             }
             this._addTimer(roomName, function() {
               this.notifyMarchingOrders(roomName, this.options.warrooms[roomName].autoMarchTime.range)
@@ -888,7 +888,7 @@ WarWatch.prototype.listClanRoster = function(roomName, channel) {
     }.bind(this))
     .catch( e => {
       channel.sendMessage('Could not get the clan roster. ' + warmatchErrorMsg)
-        .catch(logger.error.bind(logger))
+        .catch(e => {})
     })
 }
 
@@ -933,24 +933,24 @@ WarWatch.prototype.addAccount = function(roomName, channel, message) {
           if (clashid) {
             this._addAccount(clashid, member)
             channel.sendMessage(`Registered CoC account ${clashid} to discord account ${member.user.username}`)
-              .catch(logger.error.bind(logger))
+              .catch(e => {})
           }
           else {
             channel.sendMessage(
                 `**Oops...** A CoC account with name or ${acctHashLabel} matching ${clashid_or_hash} was not found on the roster` + '\n'
                 + 'find the correct ' + acctHashLabel + ' or name by running the `' + base_cmd_text + ' roster` command'
               )
-              .catch(logger.error.bind(logger))
+              .catch(e => {})
           }
         }.bind(this))
         .catch( e => {
           channel.sendMessage('Could not verify the clash account. ' + warmatchErrorMsg)
-            .catch(logger.error.bind(logger))
+            .catch(e => {})
         })
     }
     else {
       channel.sendMessage(`Could not find a discord member matching "${username}"`)
-        .catch(logger.error.bind(logger))
+        .catch(e => {})
     }
   }
 }
@@ -967,14 +967,14 @@ WarWatch.prototype.removeAccount = function(channel, message) {
     if (clashid) {
       this._removeAccount(clashid)
       channel.sendMessage(`Unregistered CoC account ${clashid}`)
-        .catch(logger.error.bind(logger))
+        .catch(e => {})
     }
     else {
       channel.sendMessage(
           `**Oops...** A CoC account with name or ${acctHashLabel} matching ${clashid_or_hash} was not registered` + '\n'
           + 'find the correct ' + acctHashLabel + ' or name by running the `' + base_cmd_text + ' roster` command'
         )
-        .catch(logger.error.bind(logger))
+        .catch(e => {})
     }
   }
 }
@@ -997,7 +997,7 @@ WarWatch.prototype.cleanupOwners = function(channel) {
   this.db.put('accounts.clash', Array.from(this.accounts.clash.entries()))
 
   channel.sendMessage(`Removed ${counter} discord accounts`)
-    .catch(logger.error.bind(logger))
+    .catch(e => {})
 }
 
 WarWatch.prototype.identifyAccount = function(roomName, channel, message, member) {
@@ -1014,11 +1014,11 @@ WarWatch.prototype.identifyAccount = function(roomName, channel, message, member
           let existing = this.accounts.clash.get(clashid)
           if (existing && existing !== member.id) {
             channel.sendMessage(`${clashid} is currently claimed and will need to be released first`)
-              .catch(logger.error.bind(logger))
+              .catch(e => {})
           } else {
             this._addAccount(clashid, member)
             channel.sendMessage(`Registered CoC account ${clashid} to discord account ${member.user.username}`)
-              .catch(logger.error.bind(logger))
+              .catch(e => {})
           }
         }
         else {
@@ -1026,12 +1026,12 @@ WarWatch.prototype.identifyAccount = function(roomName, channel, message, member
               `**Oops...** A CoC account with name or ${acctHashLabel} matching ${clashid_or_hash} was not found on the roster` + '\n'
               + 'find the correct ' + acctHashLabel + ' or name by running the `' + base_cmd_text + ' roster` command'
             )
-            .catch(logger.error.bind(logger))
+            .catch(e => {})
         }
       }.bind(this))
       .catch( e => {
         channel.sendMessage('Could not verify the clash account. ' + warmatchErrorMsg)
-          .catch(logger.error.bind(logger))
+          .catch(e => {})
       })
   }
 }
@@ -1050,18 +1050,18 @@ WarWatch.prototype.releaseAccount = function(roomName, channel, message, member)
       if (existing && existing === member.id) {
         this._removeAccount(clashid)
         channel.sendMessage(`Unregistered CoC account ${clashid}`)
-          .catch(logger.error.bind(logger))
+          .catch(e => {})
       }
       else {
         channel.sendMessage(`Cannot unregistered CoC account ${clashid}... you are not the owner`)
-          .catch(logger.error.bind(logger))
+          .catch(e => {})
       }
     }
     else {
       channel.sendMessage(
           `**Oops...** A CoC account with name or ${acctHashLabel} matching ${clashid_or_hash} was not registered` + '\n'
           + 'find the correct ' + acctHashLabel + ' or name by running the `' + base_cmd_text + ' roster` command')
-        .catch(logger.error.bind(logger))
+        .catch(e => {})
     }
   }
 }
@@ -1104,7 +1104,7 @@ WarWatch.prototype.reportStatus = function(roomName, channel) {
   }
   
   channel.sendMessage(output)
-    .catch(logger.error.bind(logger))
+    .catch(e => {})
 }
 
 WarWatch.prototype.onMessage = function(msg) {
@@ -1123,16 +1123,16 @@ WarWatch.prototype.onMessage = function(msg) {
   else if (base_cmd_regex.test(msg.content)) {
     if (! (isWarRoom || isTestMessage(msg))) {
       msg.channel.sendMessage(badChannel)
-        .catch(logger.error.bind(logger))
+        .catch(e => {})
     }
     else if (usage_cmd_regex.test(msg.content)) {
       if (isAdminUser(msg)) {
         msg.channel.sendMessage(authUsage)
-          .catch(logger.error.bind(logger))
+          .catch(e => {})
       }
       else {
         msg.channel.sendMessage(basicUsage)
-          .catch(logger.error.bind(logger))
+          .catch(e => {})
       }
     }
     else if (status_cmd_regex.test(msg.content)) {
@@ -1233,30 +1233,30 @@ WarWatch.prototype.onMessage = function(msg) {
       }
       else if (re5.test(msg.content)) {
         msg.channel.sendMessage(basicUsage)
-          .catch(logger.error.bind(logger))
+          .catch(e => {})
       }
       else if (re6.test(msg.content)) {
         msg.channel.sendMessage(authUsage)
-          .catch(logger.error.bind(logger))
+          .catch(e => {})
       }
       else {
         msg.channel.sendMessage('bad test command')
-          .catch(logger.error.bind(logger))
+          .catch(e => {})
       }
     }
     else {
       if (isAdminUser(msg)) {
         msg.channel.sendMessage('I didn\'t understand that... \n\n' + authUsage)
-          .catch(logger.error.bind(logger))
+          .catch(e => {})
       }
       else {
         msg.channel.sendMessage('I didn\'t understand that... \n\n' + basicUsage)
-          .catch(logger.error.bind(logger))
+          .catch(e => {})
       }
     }
     if (unauthorized) {
       msg.channel.sendMessage('Unauthorized... you must have the ' + authzRoleName + ' role')
-        .catch(logger.error.bind(logger))
+        .catch(e => {})
     }
   }
 }
