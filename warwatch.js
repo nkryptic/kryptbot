@@ -474,28 +474,25 @@ WarWatch.prototype.parseRoster = function(message) {
   return roster
 }
 
-WarWatch.prototype.getLineup = function(roomName) {
-  const filter = m => m.author.bot && m.content.startsWith('Our lineup')
+WarWatch.prototype._getWMInfo = function(roomName, cmd, filter, funcName) {
   // errors: ['time'] treats ending because of the time limit as an error
   let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
     .then( function(collected) {
       let response = collected.first()
       response.delete(250)
         .catch(e => {})
-      const lineup = this.parseLineup(response.content)
-      return lineup
+      const result = this[funcName](response.content)
+      return result
     }.bind(this))
     .catch(collected => {
       if (! (collected instanceof Error)) {
-        logger.error('no responses: ' + collected.size)
-        throw new Error('timeout waiting for lineup')
+        throw new Error('timeout waiting for warmatch info')
       } else {
-        logger.error('error5: ' + collected)
         throw collected
       }
     });
 
-  this.warrooms[roomName].sendMessage('.lineup')
+  this.warrooms[roomName].sendMessage(cmd)
     .then(m => {
       m.delete(250)
         .catch(e => {})
@@ -505,99 +502,26 @@ WarWatch.prototype.getLineup = function(roomName) {
   return promise
 }
 
+WarWatch.prototype.getLineup = function(roomName) {
+  const filter = m => m.author.bot && m.content.startsWith('Our lineup')
+  return this._getWMInfo(roomName, '.lineup', filter, 'parseLienup')
+}
+
 WarWatch.prototype.getMarchingOrders = function(roomName) {
   const filter = m => m.author.bot && m.content.startsWith('Marching orders')
-  // errors: ['time'] treats ending because of the time limit as an error
-  let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
-    .then( function(collected) {
-      let response = collected.first()
-      response.delete(250)
-        .catch(e => {})
-      const orders = this.parseMarchingOrders(response.content)
-      return orders
-    }.bind(this))
-    .catch(collected => {
-      if (! (collected instanceof Error)) {
-        logger.error('no responses: ' + collected.size)
-        throw new Error('timeout waiting for marching orders')
-     7} else {
-        logger.error('error7: ' + collected)
-        throw collected
-      }
-    });
-
-  this.warrooms[roomName].sendMessage('.march')
-    .then(m => {
-      m.delete(250)
-        .catch(e => {})
-    })
-    .catch(e => {})
-
-  return promise
+  return this._getWMInfo(roomName, '.march', filter, 'parseMarchingOrders')
 }
 
 WarWatch.prototype.getStatus = function(roomName) {
   // get the current war status from '.status'
   const filter = m => m.author.bot && m.author.username === 'wmbot' && status_regex.test(m.content)
-
-  let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
-    .then( function(collected) {
-      let response = collected.first()
-      response.delete(250)
-        .catch(e => {})
-      const status = this.parseStatus(response.content)
-      return status
-    }.bind(this))
-    .catch(collected => {
-      if (! (collected instanceof Error)) {
-        logger.error('no responses: ' + collected.size)
-        throw new Error('timeout waiting for status')
-      } else {
-        logger.error('error2: ' + collected)
-        throw collected
-      }
-    })
-
-  this.warrooms[roomName].sendMessage('.status')
-    .then(m => {
-      m.delete(250)
-        .catch(e => {})
-    })
-    .catch(e => {})
-
-  return promise
+  return this._getWMInfo(roomName, '.status', filter, 'parseStatus')
 }
 
 WarWatch.prototype.getRoster = function(roomName) {
   // get the current roster from '.list weight'
   const filter = m => m.author.bot && m.author.username === 'wmbot' && m.content.startsWith('List all by weight')
-
-  let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
-    .then( function(collected) {
-      let response = collected.first()
-      response.delete(250)
-        .catch(e => {})
-      const roster = this.parseRoster(response.content)
-      return roster
-    }.bind(this))
-    .catch(collected => {
-      if (! (collected instanceof Error)) {
-        logger.error('no responses: ' + collected.size)
-        throw new Error('timeout waiting for roster')
-      } else {
-        logger.error('error2: ' + collected)
-        throw collected
-      }
-    })
-
-  this.warrooms[roomName].sendMessage('.list weight')
-    .then(m => {
-      m.delete(250)
-        .catch(e => {})
-    })
-    .catch(e => {})
-
-  return promise
+  return this._getWMInfo(roomName, '.list weight', filter, 'parseRoster')
 }
 
 WarWatch.prototype._mergeLineupOrders = function(lineup, orders) {
