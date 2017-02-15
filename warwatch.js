@@ -486,7 +486,7 @@ WarWatch.prototype._getWMInfo = function(roomName, cmd, filter, funcName) {
     }.bind(this))
     .catch(collected => {
       if (! (collected instanceof Error)) {
-        throw new Error('timeout waiting for warmatch info')
+        throw new Error('timeout waiting for warmatch info (' + cmd + ')')
       } else {
         throw collected
       }
@@ -664,7 +664,7 @@ WarWatch.prototype.doReminder = function(roomName, reminderIdx, channel, testing
       .catch(e => {
         if (e.message != 'ReminderAtWrongTime') {
           let retry_count = retries || 0
-          logger.error('Failed executing reminder... issue retrieving info from warmatch')
+          logger.error('Reminder failure... warmatch retrieval error: ' + e.message)
           if ((! testing) && (retry_count < retryInfo.reminderErrorMaxTries)) {
             logger.error('retrying reminder...')
             // couldn't get status from warmatch, so retry later
