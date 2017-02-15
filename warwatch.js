@@ -479,8 +479,10 @@ WarWatch.prototype._getWMInfo = function(roomName, cmd, filter, funcName) {
   let promise = this.warrooms[roomName].awaitMessages(filter, { maxMatches: 1, time: 10000, errors: ['time'] })
     .then( function(collected) {
       let response = collected.first()
-      response.delete(250)
+      this.warrooms[roomName].bulkDelete(collected)
         .catch(e => {})
+      // response.delete()
+      //   .catch(e => {})
       const result = this[funcName](response.content)
       return result
     }.bind(this))
@@ -494,7 +496,9 @@ WarWatch.prototype._getWMInfo = function(roomName, cmd, filter, funcName) {
 
   this.warrooms[roomName].sendMessage(cmd)
     .then(m => {
-      m.delete(250)
+      // this.warrooms[roomName].bulkDelete([m])
+      //   .catch(e => {})
+      m.delete()
         .catch(e => {})
     })
     .catch(e => {})
